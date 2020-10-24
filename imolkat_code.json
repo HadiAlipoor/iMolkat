@@ -1,0 +1,165 @@
+{
+   "public_variables": [
+      {
+         "index": "0",
+         "type": "bool",
+         "default_value": "false"
+      },
+      {
+         "index": "1",
+         "type": "bool",
+         "default_value":"false"
+      }
+   ],
+   "pins": [
+      {
+         "index": "0",
+         "name": "D5",
+         "set_pin": "output",
+         "default_value": "low"
+      }
+   ],
+   "setup": {
+      "local_variables":[
+
+      ],
+      "action":[
+         
+      ]
+   },
+   "apis": [
+      {
+         "param": "lamp1",
+         "action": [
+            {
+               "command": "if",
+               "condition": {
+                  "first_part": {
+                     "public_variable": "0"
+                  },
+                  "comparison": "==",
+                  "second_part": {
+                     "type": "bool",
+                     "value": "true"
+                  }
+               },
+               "then": [
+                  {
+                     "command": "change_variable",
+                     "public_variable": "0",
+                     "value": "false"
+                  },
+                  {
+                     "command":"digital_write",
+                     "pin": "0",
+                     "value": "low"
+                  }
+               ],
+               "else": [
+                  {
+                     "command": "change_variable",
+                     "public_variable": "0",
+                     "value": "true"
+                  },
+                  {
+                     "command": "digital_write",
+                     "pin": "0",
+                     "value": "high"
+                  }
+               ]
+            },
+            {
+               "command":"response",
+               "outputs":[
+                  {
+                     "value":"lamp1 status is: "
+                  },
+                  {
+                     "public_variable": "0"
+                  }
+               ]
+            }
+         ]
+      },
+      {
+         "param": "lamp1blink",
+         "action": [
+            {
+               "command": "if",
+               "condition": {
+                  "first_part": {
+                     "public_variable": "1"
+                  },
+                  "comparison": "==",
+                  "second_part": {
+                     "type": "bool",
+                     "value": "true"
+                  }
+               },
+               "then": [
+                  {
+                     "command": "change_variable",
+                     "public_variable": "1",
+                     "value": "false"
+                  }
+               ],
+               "else": [
+                  {
+                     "command": "change_variable",
+                     "public_variable": "1",
+                     "value": "true"
+                  }
+               ]
+            },
+            {
+               "command":"response",
+               "outputs":[
+                  {
+                     "value":"lamp1 blinking status is: "
+                  },
+                  {
+                     "public_variable": "1"
+                  }
+               ]
+            }
+         ]
+      }
+   ],
+   "loop":[
+      {
+         "command": "if",
+         "condition": {
+            "first_part": {
+               "public_variable": "1"
+            },
+            "comparison": "==",
+            "second_part": {
+               "type": "bool",
+               "value": "true"
+            }
+         },
+         "then": [
+            {
+               "command":"digital_write",
+               "pin": "0",
+               "value": "high"
+            },
+            {
+               "command": "delay",
+               "milisecond": "500"
+            },
+            {
+               "command":"digital_write",
+               "pin": "0",
+               "value": "low"
+            },
+            {
+               "command": "delay",
+               "milisecond": "500"
+            }         
+         ],
+         "else": [
+         ]
+      }
+   ]
+}
