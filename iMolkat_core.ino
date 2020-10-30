@@ -1,67 +1,72 @@
 #include <ESP8266HTTPClient.h>
-#include <Ethernet.h>
 #include <ESP8266WiFi.h>
-#include <WiFiClient.h> 
+#include <WiFiClient.h>
 #include <ESP8266WebServer.h>
 #include <ESP8266mDNS.h>
-#include <ArduinoJson.h>
+#include <LuaWrapper.h>
 
+LuaWrapper lua;
 ESP8266WebServer server(80);
-String json_code; 
+String json_code;
 
-// Module connection pins (Digital Pins)
-#define D0 16
-#define D1 5
-#define D2 4
-#define D3 0
-#define D4 2
-#define D5 14
-#define D6 12
-#define D7 13
-#define D8 15
-#define D9 3
-#define D10 1
-
-class Variable{
+class Api
+{
   public:
-    struct VariableStruct{
-      String type;
-      String value;
-    };
-    Variable(){
+    Api(){
+      Api::inputIndex = 0;
+      Api::inputs = ",";
     }
-    void addNewVariable(int index, String type, String value){
-      variableArrays[index].type = type;
-      variableArrays[index].value = value;
+    void setName(String name){
+      Api::name = name;
+    }
+    String getName(){
+      return Api::name;
+    }
+    void addInput(String input){
+      Api::inputs = Api::inputs + input + ",";
+      Api::inputIndex++;
+    }
+    int getSize(){
+      return Api::inputIndex;
+    }
+    String getInput(int index)
+    {
+      int indexCount = 0;
+      int start_index = 0;
+      for (int i = 0; i < Api::inputs.length()-1; i++)
+      {
+        if (Api::inputs.substring(i,i+1) == ",")
+        {
+          if (start_index == 0)
+          {
+            start_index = i + 1;
+          }
+          else
+          {
+            String input = Api::inputs.substring(start_index, i);
+            if (indexCount == index)
+            { 
+              return input;
+            }
+            indexCount++;
+          }
+        }
+      }
     }
 
-    void changeValue(int index, String value){
-      variableArrays[index].value = value;
-    }
-
-    String getType(int index){
-      return variableArrays[index].type;
-    }
-    String getStringValue(int index){
-      return variableArrays[index].value;
-    }
-    int getIntValue(int index){
-      return variableArrays[index].value.toInt();
-    }
-    bool getBoolValue(int index){
-      if(variableArrays[index].value == "true")
-        return true;
-      else
-        return false;
-    }
   private:
-    VariableStruct variableArrays[100];
+    String name;
+    String inputs;
+    int inputIndex;
 };
 
-String httpGet(String url){
+Api apis[100];
+int api_count = 0;
+
+String httpGet(String url) {
   String payload ;
   //Check WiFi connection status
-    if(WiFi.status()== WL_CONNECTED){
+  if (WiFi.status() == WL_CONNECTED) {
     WiFiClient client;
 
     HTTPClient http;
@@ -93,64 +98,10 @@ String httpGet(String url){
   }
 }
 
-Variable publicVariables = Variable();
-int pins[10];
 
-void manageVariables(String jsonCode){
-  DynamicJsonDocument doc(2048);
-  deserializeJson(doc, jsonCode);
-  for(int i = 0;i < doc["public_variables"].size();i++){
-    publicVariables.addNewVariable(doc["public_variables"][i]["index"].as<int>(), doc["public_variables"][i]["type"].as<String>(),doc["public_variables"][i]["value"].as<String>());
-  }
-}
-
-void managePins(String jsonCode){
-  DynamicJsonDocument doc(2048);
-  deserializeJson(doc, jsonCode);
-  for(int i = 0;i < doc["pins"].size();i++){
-    if(doc["pins"][i]["name"].as<String>() == "D0"){
-      pins[doc["pins"][i]["index"].as<int>()] = D0;
-    }else if(doc["pins"][i]["name"].as<String>() == "D1"){
-      pins[doc["pins"][i]["index"].as<int>()] = D1;
-    }else if(doc["pins"][i]["name"].as<String>() == "D2"){
-      pins[doc["pins"][i]["index"].as<int>()] = D2;
-    }else if(doc["pins"][i]["name"].as<String>() == "D3"){
-      pins[doc["pins"][i]["index"].as<int>()] = D3;
-    }else if(doc["pins"][i]["name"].as<String>() == "D4"){
-      pins[doc["pins"][i]["index"].as<int>()] = D4;
-    }else if(doc["pins"][i]["name"].as<String>() == "D5"){
-      pins[doc["pins"][i]["index"].as<int>()] = D5;
-    }else if(doc["pins"][i]["name"].as<String>() == "D6"){
-      pins[doc["pins"][i]["index"].as<int>()] = D6;
-    }else if(doc["pins"][i]["name"].as<String>() == "D7"){
-      pins[doc["pins"][i]["index"].as<int>()] = D7;
-    }else if(doc["pins"][i]["name"].as<String>() == "D8"){
-      pins[doc["pins"][i]["index"].as<int>()] = D8;
-    }else if(doc["pins"][i]["name"].as<String>() == "D9"){
-      pins[doc["pins"][i]["index"].as<int>()] = D9;
-    }else if(doc["pins"][i]["name"].as<String>() == "D10"){
-      pins[doc["pins"][i]["index"].as<int>()] = D10;
-    }
-
-    if(doc["pins"][i]["set_pin"].as<String>() == "output"){
-      pinMode(pins[doc["pins"][i]["index"].as<int>()], OUTPUT);
-    }else if(doc["pins"][i]["set_pin"].as<String>() == "input"){
-      pinMode(pins[doc["pins"][i]["index"].as<int>()], INPUT);
-    }
-
-    if(!doc["pins"][i]["default_value"].isNull()){
-      if(doc["pins"][i]["default_value"].as<String>() == "high"){
-        digitalWrite(pins[doc["pins"][i]["index"].as<int>()], HIGH);
-      }else if(doc["pins"][i]["default_value"].as<String>() == "low"){
-        digitalWrite(pins[doc["pins"][i]["index"].as<int>()], LOW);
-      }
-    }
-  }
-  
-}
 String getHtml() {
   String deviceIP = WiFi.localIP().toString();
-  
+
   String clientHtml = "Hello World";
   return clientHtml;
 
@@ -160,13 +111,14 @@ void handleRoot() {
 }
 
 
-void responseHtml(String _status)
+void responseHtml(lua_State *lua)
 {
+  String msg = String(luaL_checkstring(lua, 1));
   server.sendHeader("Access-Control-Max-Age", "10000");
   server.sendHeader("Access-Control-Allow-Methods", "POST,GET,OPTIONS");
   server.sendHeader("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
   server.sendHeader("Access-Control-Allow-Origin", "*");
-  server.send(200, "text/html", _status);
+  server.send(200, "text/html", msg);
 }
 
 void handleNotFound() {
@@ -190,215 +142,118 @@ void handleNotFound() {
 
 const char* deviceName = "iMolkat";
 
-void manageResponse(DynamicJsonDocument outputs){
-  String output = "";
-  for(int i = 0;i < outputs.size();i++){
-    if(!outputs[i]["public_variable"].isNull()){
-      output = output + publicVariables.getStringValue(outputs[i]["public_variable"].as<int>());
-    }else{
-      output = output + outputs[i]["value"].as<String>();
-    }
-  }
 
-  responseHtml(output);
-}
-
-void handle_if_action(DynamicJsonDocument action){
-  String variableType;
-  if(!action["condition"]["first_part"]["public_variable"].isNull()){
-    variableType = publicVariables.getType(action["condition"]["first_part"]["public_variable"].as<int>());
-  }
-  else{
-    variableType = action["condition"]["first_part"]["type"].as<String>();
-  }
-  
-  if(variableType == "String"){
-      String first_part;
-      if(!action["condition"]["first_part"]["public_variable"].isNull()){
-        first_part = publicVariables.getStringValue(action["condition"]["first_part"]["public_variable"].as<int>());
-      }else{
-        first_part = action["condition"]["first_part"]["value"].as<String>();
-      }
-      String second_part;
-      if(!action["condition"]["second_part"]["public_variable"].isNull()){
-        second_part = publicVariables.getStringValue(action["condition"]["second_part"]["public_variable"].as<int>());
-      }else{
-        second_part = action["condition"]["second_part"]["value"].as<String>();
-      }
-      String comparison = action["condition"]["comparison"].as<String>();
-      if(comparison == "=="){
-        if(first_part == second_part){
-          do_action(action["then"]);
-        }else{
-          do_action(action["else"]);
-        }
-      }else if(comparison == ">"){
-        if(first_part > second_part){
-          do_action(action["then"]);
-        }else{
-          do_action(action["else"]);
-        }
-      }else if(comparison == "=>" || comparison == ">="){ 
-        if(first_part >= second_part){
-          do_action(action["then"]);
-        }else{
-          do_action(action["else"]);
-        }
-      }else if(comparison == "<"){      
-        if(first_part < second_part){
-          do_action(action["then"]);
-        }else{
-          do_action(action["else"]);
-        }
-      }else if(comparison == "<=" || comparison == "=<"){
-        if(first_part <= second_part){
-          do_action(action["then"]);
-        }else{
-          do_action(action["else"]);
-        }
-      }else if(comparison == "!="){
-        if(first_part != second_part){
-          do_action(action["then"]);
-        }else{
-          do_action(action["else"]);
-        }
-      }
-  }else if(variableType == "int"){
-      int first_part;
-      if(!action["condition"]["first_part"]["public_variable"].isNull()){
-        first_part = publicVariables.getIntValue(action["condition"]["first_part"]["public_variable"].as<int>());
-      }else{
-        first_part = action["condition"]["first_part"]["value"].as<int>();
-      }
-      int second_part;
-      if(!action["condition"]["second_part"]["public_variable"].isNull()){
-        second_part = publicVariables.getIntValue(action["condition"]["second_part"]["public_variable"].as<int>());
-      }else{
-        second_part = action["condition"]["second_part"]["value"].as<int>();
-      }
-      String comparison = action["condition"]["comparison"].as<String>();
-      if(comparison == "=="){
-        if(first_part == second_part){
-          do_action(action["then"]);
-        }else{
-          do_action(action["else"]);
-        }
-      }else if(comparison == ">"){
-        if(first_part > second_part){
-          do_action(action["then"]);
-        }else{
-          do_action(action["else"]);
-        }
-      }else if(comparison == "=>" || comparison == ">="){ 
-        if(first_part >= second_part){
-          do_action(action["then"]);
-        }else{
-          do_action(action["else"]);
-        }
-      }else if(comparison == "<"){      
-        if(first_part < second_part){
-          do_action(action["then"]);
-        }else{
-          do_action(action["else"]);
-        }
-      }else if(comparison == "<=" || comparison == "=<"){
-        if(first_part <= second_part){
-          do_action(action["then"]);
-        }else{
-          do_action(action["else"]);
-        }
-      }else if(comparison == "!="){
-        if(first_part != second_part){
-          do_action(action["then"]);
-        }else{
-          do_action(action["else"]);
-        }
-      }
-  }else if(variableType == "bool"){
-      String first_part;
-      if(!action["condition"]["first_part"]["public_variable"].isNull()){
-        first_part = publicVariables.getStringValue(action["condition"]["first_part"]["public_variable"].as<int>());
-      }else{
-        first_part = action["condition"]["first_part"]["value"].as<String>();
-      }
-      String second_part;
-      if(!action["condition"]["second_part"]["public_variable"].isNull()){
-        second_part = publicVariables.getStringValue(action["condition"]["second_part"]["public_variable"].as<int>());
-      }else{
-        second_part = action["condition"]["second_part"]["value"].as<String>();
-      }
-      String comparison = action["condition"]["comparison"].as<String>();
-      if(comparison == "=="){
-        if(first_part == second_part){
-          Serial.println("true");
-          do_action(action["then"]);
-        }else{
-          Serial.println("false");
-          do_action(action["else"]);
-        }
-      }else if(comparison == "!="){
-        if(first_part != second_part){
-          do_action(action["then"]);
-        }else{
-          do_action(action["else"]);
-        }
-      }
-  }
-}
-void do_action(DynamicJsonDocument action){
-  for(int i = 0;i < action.size();i++){
-    Serial.println(action[i]["command"].as<String>());
-    if(action[i]["command"].as<String>() == "if"){
-      handle_if_action(action[i]);
-    }else if(action[i]["command"].as<String>() == "change_variable"){
-      publicVariables.changeValue(action[i]["public_variable"].as<int>(), action[i]["value"].as<String>());
-    }else if(action[i]["command"].as<String>() == "digital_write"){
-      if(action[i]["value"].as<String>() == "high"){
-        digitalWrite(pins[action[i]["pin"].as<int>()], HIGH);
-      }else if(action[i]["value"].as<String>() == "low"){
-        digitalWrite(pins[action[i]["pin"].as<int>()], LOW);
-      }
-    }else if(action[i]["command"].as<String>() == "delay"){
-      delay(action[i]["milisecond"].as<int>());
-    }else if(action[i]["command"].as<String>() == "response"){
-      manageResponse(action[i]["outputs"]);
-    }
-  }
-}
-void handleAPI(String param, String value)
+void handleAPI()
 {
-  DynamicJsonDocument doc(2048);
-  deserializeJson(doc, json_code);
-
-  for(int i = 0;i < doc["apis"].size();i++){
-    String jsonParam = doc["apis"][i]["param"];
-    if(param == jsonParam){
-      do_action(doc["apis"][i]["action"]);
-    }
-  }
+  String api_name=server.uri().substring(5);
+  String inputs_string = "";
+  Serial.println(api_name);
+  int output = server.args();
+  // struct Argument
+  // {
+  //   String value;
+  //   String parameter;
+  // };
+  // Argument arguments[100];
+  // for (int j = 0; j < output; j++)
+  // {
+  //   Argument argg;
+  //   argg.parameter = server.argName(j);
+  //   argg.value = server.arg(j);
+  //   Serial.println(argg.parameter + " = " + argg.value);
+  //   arguments[j] = argg;
+  // }
+  // for (int i = 0; i < sizeof(apis); i++)
+  // {
+  //   if(apis[i].getName() == api_name)
+  //   {
+  //     for (int j = 0; j < apis[i].getSize(); j++)
+  //     {
+  //       inputs_string = inputs_string + apis[i].getInput(j);
+  //       if (j != apis[i].getSize()-1)
+  //       {
+  //         inputs_string = inputs_string + ", ";
+  //       }
+  //     }
+  //     break;
+  //   }
+  // }
+  
+  char run_api_func[200];
+  snprintf(run_api_func,sizeof(run_api_func),"%s(%s)",api_name.c_str(),inputs_string.c_str());
+  // Serial.printf("url_text : %s; function : %s()",String(url_text).c_str(),api_name.c_str());
+  String api_func = String(run_api_func);
+  Serial.println(api_func);
+  Serial.println(lua.Lua_dostring(&api_func)); 
+  // responseHtml("OK");     
 }
 
-
-
+void manageApis(String lua_code){
+  for (int i = 0; i < lua_code.length()-8; i++)
+  {
+    if (lua_code.substring(i, i+6)=="--#api")
+    {
+      int start_index = 0;
+      for (int j = i+3; j < lua_code.length()-10; j++)
+      {        
+        if (lua_code.substring(j,j+8)=="function")
+        {
+          start_index = j+9;
+        }
+        if(start_index!=0 && lua_code.substring(j,j+1)=="(")
+        {
+          String api_name = lua_code.substring(start_index,j);
+          api_name.trim();
+          apis[api_count].setName(api_name);
+          int input_start_index = 0;
+          if(lua_code.substring(j+1,j+2) != ")")
+          {
+            for (int k = j+2; k < lua_code.length()-10; k++)
+            {
+              if(lua_code.substring(k,k+1) == ",")
+              {
+                String input = lua_code.substring(input_start_index, k);
+                input.trim();
+                apis[api_count].addInput(input);
+                input_start_index = k+1;
+              }
+              else if(lua_code.substring(k,k+1) == ")")
+              {
+                String input = lua_code.substring(input_start_index, k);
+                input.trim();
+                apis[api_count].addInput(input);
+                break;
+              }
+            }
+          }
+          api_count++;
+          break;
+        }        
+      }      
+    }    
+  }  
+}
+String api_name;
+char url_text[200];
 void setup() {
 #ifndef STASSID
-#define STASSID "WIFI_SSID" //change it!
-#define STAPSK  "WIFI_PASSWORD" //change it!
+#define STASSID "Molkat"
+#define STAPSK  "Bo!2bjaq"
 #endif
 
-const char* ssid = STASSID;
-const char* password = STAPSK;
+  const char* ssid = STASSID;
+  const char* password = STAPSK;
 
   //Static IP address configuration
-IPAddress staticIP(192, 168, 1, 66); //ESP static ip
-IPAddress gateway(192, 168, 1, 1);   //IP Address of your WiFi Router (Gateway)
-IPAddress subnet(255, 255, 0, 0);
-IPAddress primaryDNS(8, 8, 8, 8);   //optional
-IPAddress secondaryDNS(8, 8, 4, 4); //optional
+  IPAddress staticIP(192, 168, 1, 66); //ESP static ip
+  IPAddress gateway(192, 168, 1, 1);   //IP Address of your WiFi Router (Gateway)
+  IPAddress subnet(255, 255, 0, 0);
+  IPAddress primaryDNS(8, 8, 8, 8);   //optional
+  IPAddress secondaryDNS(8, 8, 4, 4); //optional
 
   Serial.begin(115200);
-  
-  
+
+
   WiFi.hostname(deviceName);      // DHCP Hostname (useful for finding device for static lease)local_
   if (!WiFi.config(staticIP, gateway, subnet, primaryDNS, secondaryDNS)) {
     Serial.println("STA Failed to configure");
@@ -420,36 +275,45 @@ IPAddress secondaryDNS(8, 8, 4, 4); //optional
   if (MDNS.begin("esp8266")) {
     Serial.println("MDNS responder started");
   }
-  json_code = httpGet("http://www.imolkat.com/jasoncode.html");
-  Serial.println(json_code);
-  manageVariables(json_code);
-  managePins(json_code);
-
+  String lua_code = httpGet("http://www.imolkat.com/code.html");
+  lua.Lua_register("responseHtml", (const lua_CFunction) &responseHtml);
+  Serial.println(lua.Lua_dostring(&lua_code));
+  manageApis(lua_code);
+  
   server.on("/", handleRoot);
 
+  for (int i = 0; i < api_count; i++)
+  {
+    api_name = apis[i].getName();
+    snprintf(url_text,sizeof(url_text), "/api/%s",api_name.c_str());
+    Serial.println(url_text);
+    server.on(String(url_text), handleAPI);
+
+  }
+  
 
   server.on("/api", []() {
 
     String param = server.argName(0);
     String value = server.arg(0);
     Serial.println(param + " = " + value);
-    handleAPI(param, value);
+    // handleAPI(param, value);
   });
 
-  
+
   server.onNotFound(handleNotFound);
 
   server.begin();
   Serial.println("HTTP server started");
+  String run_setup = String("Setup()");
+  Serial.println(lua.Lua_dostring(&run_setup));
 }
 
 
 void loop(void) {
+  String run_loop = String("Loop()");
+  lua.Lua_dostring(&run_loop);
   server.handleClient();
   MDNS.update();
 
-  DynamicJsonDocument doc(4096);
-  deserializeJson(doc, json_code);
-  Serial.println(doc["loop"].size());
-  do_action(doc["loop"]);
 }
