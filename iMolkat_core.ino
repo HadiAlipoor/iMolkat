@@ -237,8 +237,8 @@ String api_name;
 char url_text[200];
 void setup() {
 #ifndef STASSID
-#define STASSID "Molkat"
-#define STAPSK  "Bo!2bjaq"
+#define STASSID "YOUR_SSID"
+#define STAPSK  "YOUR_PASSWORD"
 #endif
 
   const char* ssid = STASSID;
