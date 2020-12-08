@@ -9,6 +9,7 @@ LuaWrapper lua;
 ESP8266WebServer server(80);
 String json_code;
 
+String testt;
 class Api
 {
   public:
