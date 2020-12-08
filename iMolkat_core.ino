@@ -237,8 +237,8 @@ String api_name;
 char url_text[200];
 void setup() {
 #ifndef STASSID
-#define STASSID "YOUR_SSID"
-#define STAPSK  "YOUR_PASSWORD"
+#define STASSID "Molkat"
+#define STAPSK  "Bo!2bjaq"
 #endif
 
   const char* ssid = STASSID;
@@ -275,7 +275,7 @@ void setup() {
   if (MDNS.begin("esp8266")) {
     Serial.println("MDNS responder started");
   }
-  String lua_code = httpGet("http://www.imolkat.com/code.html");
+  String lua_code = httpGet("http://192.168.1.12:84/code.lua");
   lua.Lua_register("responseHtml", (const lua_CFunction) &responseHtml);
   Serial.println(lua.Lua_dostring(&lua_code));
   manageApis(lua_code);

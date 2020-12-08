@@ -24,11 +24,8 @@ List::List()
 
 void List::add(String value)
 {
-    char add_to_array[200];
     List:_size++;
-    snprintf(add_to_array,sizeof(add_to_array),"MyArray[%i] = '%s' print(MyArray[%i])", List::_size, value.c_str(), List::_size);
-    String add_code = String(add_to_array);
-    Serial.println(List::lua.Lua_dostring(&add_code));
+    List::set(value, List::_size);
 }
 
 int List::size()
@@ -46,7 +43,10 @@ String List::get(int index)
     return lua_tostring(List::lua.get_lua_State(), -1);
 }
 
-int List::getIntValue(int index)
+void List::set(String value, int index)
 {
-
+    char add_to_array[200];
+    snprintf(add_to_array,sizeof(add_to_array),"MyArray[%i] = '%s' print(MyArray[%i])", List::_size, value.c_str(), index);
+    String add_code = String(add_to_array);
+    Serial.println(List::lua.Lua_dostring(&add_code));
 }

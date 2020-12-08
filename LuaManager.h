@@ -4,24 +4,22 @@
 */
 
 // ensure this library description is only included once
-#ifndef List_h
-#define List_h
+#ifndef LuaManager_h
+#define LuaManager_h
 
 #include "WString.h"
-#include <LuaWrapper.h>
+#include <vfs.h>
+#include <SPI.h>
+#include <FS.h>
 
 // include types & constants of Wiring core API
-class List
+class LuaManager
 {
-  public:
-    List();
-    void add(String value);
-    int size();
-    void set(String value, int index);
-    String get(int index);
-  private:
-    LuaWrapper lua;
-    int _size;
+    public:
+        LuaManager();
+        String getLuaCode();
+    private:
+        String file_open(char *path);
 };
 
 #endif
