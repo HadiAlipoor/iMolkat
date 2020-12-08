@@ -5,11 +5,13 @@
 #include <ESP8266mDNS.h>
 #include <LuaWrapper.h>
 
+#include "DbManager.h"
+
 LuaWrapper lua;
 ESP8266WebServer server(80);
 String json_code;
 
-String testt;
+
 class Api
 {
   public:
@@ -99,6 +101,13 @@ String httpGet(String url) {
   }
 }
 
+int db_exec(lua_State *lua){
+  char* dbName =  const_cast<char*>((String(luaL_checkstring(lua, 1))).c_str());
+  char* sql = const_cast<char*>((String(luaL_checkstring(lua, 2))).c_str());
+
+  DbManager dbManager = DbManager(dbName);
+  return dbManager.ExecuteQuery(sql);
+}
 
 String getHtml() {
   String deviceIP = WiFi.localIP().toString();
@@ -278,6 +287,7 @@ void setup() {
   }
   String lua_code = httpGet("http://192.168.1.12:84/code.lua");
   lua.Lua_register("responseHtml", (const lua_CFunction) &responseHtml);
+  lua.Lua_register("ExecuteQuery", (const lua_CFunction) &db_exec);
   Serial.println(lua.Lua_dostring(&lua_code));
   manageApis(lua_code);
   
