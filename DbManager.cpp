@@ -1,13 +1,16 @@
 #include "DbManager.h";
 
-DbManager::DbManager(char *databaseName){
-    DbManager::dbName = databaseName;
-    db_write("");
+DbManager::DbManager(const char *databaseName){
+    dbName = databaseName;
+    if (db_open() == "no_file")
+    {
+      db_write("");
+    }    
 }
 
 char *DbManager::getDbPath(){
     char dbPath[30];    
-    sprintf(dbPath,"/%s.db",DbManager::dbName);
+    sprintf(dbPath,"/%s.db",dbName);
     return dbPath;
 }
 
@@ -22,6 +25,7 @@ String DbManager::db_open() {
         Serial.println("Failed to open file for reading"); 
         return "no_file"; 
     }
+    // Serial.println(file.readString());
     return file.readString();
 }
 
@@ -61,7 +65,6 @@ bool DbManager::CheckForDatabase(){
    while (dir.next()) {    
        String fileName = dir.fileName();
        size_t fileSize = dir.fileSize();
-       Serial.println(fileName);
        if (fileName == String(String(DbManager::dbName) + ".db"))
        {
             Serial.printf("Database %s already exists. size : %s\n", fileName.c_str(), (long) fileSize);
@@ -74,7 +77,6 @@ bool DbManager::CheckForDatabase(){
 
 
 String DbManager::subString(const char *text, int startIndex, int size){
-    // Serial.printf("substring text : %s\n",text);
     String res = "";
     for (int j = 0; j < size; j++)
     {
@@ -88,7 +90,7 @@ String DbManager::subString(const char *text, int startIndex, int size){
     
     return res;
 }
-bool DbManager::handleInsert(char *sql){
+bool DbManager::handleInsert(const char *sql){
     List columnsList = List();
     List dataList = List();
     String tableName = "";
@@ -137,17 +139,15 @@ bool DbManager::handleInsert(char *sql){
                                                     JsonObject rowJson = rowJsonDoc.to<JsonObject>();
                                                     for (int i = 0; i < columnsList.size(); i++)
                                                     {
-                                                        char *tempRes = columnsList.getCharArray(i);
-                                                        const int colNmeSze = sizeof(columnsList.getCharArray(i));
+                                                        String tempRes = columnsList.get(i);
+                                                        const int colNmeSze = columnsList.get(i).length();
                                                         char columnName[colNmeSze+1];
                                                         for (int h = 0; h <= colNmeSze; h++)
                                                         {
-                                                            columnName[h] = tempRes[h];
+                                                            columnName[h] = tempRes.charAt(h);
                                                         }
                                                         columnName[colNmeSze+1]='\0';
-                                                        //  = columnsList.getCharArray(i);
                                                         rowJson[columnName] = dataList.get(i);
-                                                        // Serial.printf("column: %s\n", rowJson[columnName].as<String>());
                                                     }
                                                     String rowsJsonArraysString;
                                                     serializeJson(rowsJsonArrays, rowsJsonArraysString);
@@ -171,15 +171,16 @@ bool DbManager::handleInsert(char *sql){
     }    
     return false;
 }
-bool DbManager::handleUpdate(char *sql){
+bool DbManager::handleUpdate(const char *sql){
 
     return true;
 }
-bool DbManager::handleDelete(char *sql){
+bool DbManager::handleDelete(const char *sql){
 
     return true;
 }
-bool DbManager::handleCreateTable(char *sql){
+bool DbManager::handleCreateTable(const char *sql){
+    Serial.println(sql);
     List columnsList= List();
     for (int i = 0; i < strlen(sql)-13; i++)
     {
@@ -190,7 +191,7 @@ bool DbManager::handleCreateTable(char *sql){
                 if (subString(sql,j,1)=="(")
                 {
                     String tableName = subString(sql,i+13, j-(i+13)).c_str();
-                    //trim it!!!!!!!!!!!
+                    tableName.trim();
                     int columnStartIndex = j+1;
                     for (int k = j; k < strlen(sql) ;k++)
                     {
@@ -202,6 +203,19 @@ bool DbManager::handleCreateTable(char *sql){
                             columnsList.add(subString(sql,columnStartIndex,k-columnStartIndex));
                             DynamicJsonDocument doc(1024);
                             doc = db_open_json();
+                            bool tableExists = false;
+                            JsonArray tableJsonArrays = doc["tables"].as<JsonArray>();
+                            for(JsonObject tableJson : tableJsonArrays) {
+                                if (tableJson["name"].as<String>() == tableName)
+                                {
+                                    tableExists = true;
+                                }
+                            }
+                            if (tableExists)
+                            {
+                                return false;
+                            }
+                            
                             JsonArray tableArrays = doc.createNestedArray("tables");
                             JsonObject newTable = tableArrays.createNestedObject();
                             newTable["name"]= tableName;
@@ -213,7 +227,7 @@ bool DbManager::handleCreateTable(char *sql){
                             JsonArray rowsArray = newTable.createNestedArray("rows");
                             String newDbString;
                             serializeJson(doc,newDbString);
-                            Serial.printf("json => %s\n", newDbString.c_str());
+                            // Serial.printf("json => %s\n", newDbString.c_str());
                             return db_write(newDbString);
                         }                        
                     }                    
@@ -223,7 +237,7 @@ bool DbManager::handleCreateTable(char *sql){
     }    
     return false;
 }
-bool DbManager::ExecuteQuery(char *sql) {
+bool DbManager::ExecuteQuery(const char *sql) {
     // for (int i = 0; i < strlen(sql); i++)
     // {
         int i = 0;

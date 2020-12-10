@@ -19,8 +19,8 @@ extern "C" {
 
 class DbManager{
     public:
-        DbManager(char *databaseName);
-        bool ExecuteQuery(char *sql);
+        DbManager(const char *databaseName);
+        bool ExecuteQuery(const char *sql);
         DynamicJsonDocument SelectQuery(const char *sql);
         bool CheckForDatabase();
         String subString(const char *text, int startIndex, int size);
@@ -29,12 +29,12 @@ class DbManager{
         char *getDbPath();
         DynamicJsonDocument db_open_json();        
     private:
-        bool handleInsert(char *sql);
-        bool handleUpdate(char *sql);
-        bool handleDelete(char *sql);
-        bool handleCreateTable(char *sql);
+        bool handleInsert(const char *sql);
+        bool handleUpdate(const char *sql);
+        bool handleDelete(const char *sql);
+        bool handleCreateTable(const char *sql);
         String getString(String text);
-        char *dbName;
-        bool parseExecQuery(char *sql);
+        const char *dbName;
+        bool parseExecQuery(const char *sql);
 };
 #endif

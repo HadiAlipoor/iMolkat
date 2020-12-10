@@ -7,10 +7,10 @@
 
 #include "DbManager.h"
 
-LuaWrapper lua;
+LuaWrapper lua_global;
 ESP8266WebServer server(80);
 String json_code;
-
+const char* deviceName = "iMolkat";
 
 class Api
 {
@@ -101,9 +101,41 @@ String httpGet(String url) {
   }
 }
 
-int db_exec(lua_State *lua){
-  char* dbName =  const_cast<char*>((String(luaL_checkstring(lua, 1))).c_str());
-  char* sql = const_cast<char*>((String(luaL_checkstring(lua, 2))).c_str());
+int ConvertInttoString(lua_State *lua){
+  const char *str = String(luaL_checkinteger(lua, 1)).c_str();
+  // str = "HAddiii";
+  lua_pushstring(lua, str); //str is the const char* that points to your string
+  return 1; //we are returning one value, the string
+}
+
+bool db_select(lua_State *lua){
+  Serial.println("HEREEEE");
+  size_t *ldn;
+  size_t *lsql;
+  const char* dbName =  luaL_checklstring(lua, 1, ldn);
+  const char* sql = luaL_checklstring(lua, 2, lsql);
+  Serial.println("HEREEEE444444444444");
+  Serial.println(sql);
+  Serial.println(sql);
+
+  DbManager dbManager = DbManager(dbName);
+  DynamicJsonDocument doc(1024);
+  doc = dbManager.SelectQuery(sql);
+  
+  String res;
+  serializeJson(doc, res);
+  Serial.printf("end of db_select: %s",res.c_str());
+  lua_pushstring(lua, res.c_str());
+  
+  return 1;
+}
+
+bool db_exec(lua_State *lua){
+  size_t *ldn;
+  size_t *lsql;
+  const char* dbName =  luaL_checklstring(lua, 1, ldn);
+  const char* sql = luaL_checklstring(lua, 2, lsql);
+  Serial.println(sql);
 
   DbManager dbManager = DbManager(dbName);
   return dbManager.ExecuteQuery(sql);
@@ -147,12 +179,6 @@ void handleNotFound() {
   server.send(404, "text/plain", message);
 }
 
-
-
-
-const char* deviceName = "iMolkat";
-
-
 void handleAPI()
 {
   String api_name=server.uri().substring(5);
@@ -194,7 +220,7 @@ void handleAPI()
   // Serial.printf("url_text : %s; function : %s()",String(url_text).c_str(),api_name.c_str());
   String api_func = String(run_api_func);
   Serial.println(api_func);
-  Serial.println(lua.Lua_dostring(&api_func)); 
+  Serial.println(lua_global.Lua_dostring(&api_func)); 
   // responseHtml("OK");     
 }
 
@@ -246,17 +272,20 @@ void manageApis(String lua_code){
 String api_name;
 char url_text[200];
 void setup() {
+
+  SPIFFS.begin();
+  SPIFFS.format();
 #ifndef STASSID
-#define STASSID "Molkat"
-#define STAPSK  "Bo!2bjaq"
+#define STASSID "V20"
+#define STAPSK  "qazxsw21"
 #endif
 
   const char* ssid = STASSID;
   const char* password = STAPSK;
 
   //Static IP address configuration
-  IPAddress staticIP(192, 168, 1, 66); //ESP static ip
-  IPAddress gateway(192, 168, 1, 1);   //IP Address of your WiFi Router (Gateway)
+  IPAddress staticIP(192, 168, 43, 67); //ESP static ip
+  IPAddress gateway(192, 168, 43, 1);   //IP Address of your WiFi Router (Gateway)
   IPAddress subnet(255, 255, 0, 0);
   IPAddress primaryDNS(8, 8, 8, 8);   //optional
   IPAddress secondaryDNS(8, 8, 4, 4); //optional
@@ -285,10 +314,21 @@ void setup() {
   if (MDNS.begin("esp8266")) {
     Serial.println("MDNS responder started");
   }
-  String lua_code = httpGet("http://192.168.1.12:84/code.lua");
-  lua.Lua_register("responseHtml", (const lua_CFunction) &responseHtml);
-  lua.Lua_register("ExecuteQuery", (const lua_CFunction) &db_exec);
-  Serial.println(lua.Lua_dostring(&lua_code));
+  
+
+  // String lua_json = httpGet("http://192.168.43.136:84/json.lua");
+  String lua_code = httpGet("http://192.168.43.136:84/code.lua");
+  lua_global.Lua_register("responseHtml", (const lua_CFunction) &responseHtml);
+  lua_global.Lua_register("SelectQuery", (const lua_CFunction) &db_select);
+  lua_global.Lua_register("ExecuteQuery", (const lua_CFunction) &db_exec);
+  lua_global.Lua_register("tostring", (const lua_CFunction) &ConvertInttoString);
+  // Serial.println(lua_global.Lua_dostring(&lua_json));
+  // lua_code = lua_json + "\n" + lua_code;
+  // Serial.println(lua_code);
+  
+  // Serial.println(lua_global.Lua_dostring(&lua_json));
+  // luaL_openlibs(lua_global.get_lua_State());
+  Serial.println(lua_global.Lua_dostring(&lua_code));
   manageApis(lua_code);
   
   server.on("/", handleRoot);
@@ -317,13 +357,14 @@ void setup() {
   server.begin();
   Serial.println("HTTP server started");
   String run_setup = String("Setup()");
-  Serial.println(lua.Lua_dostring(&run_setup));
+  Serial.println(lua_global.Lua_dostring(&run_setup));
 }
 
 
 void loop(void) {
   String run_loop = String("Loop()");
-  lua.Lua_dostring(&run_loop);
+  lua_global.Lua_dostring(&run_loop);
+  
   server.handleClient();
   MDNS.update();
 

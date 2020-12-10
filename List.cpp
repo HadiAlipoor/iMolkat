@@ -17,36 +17,71 @@
 
 List::List()
 {
-    List::_size = 0;
-    String declare_array = String("MyArray = {} function getvalue(index) return MyArray[index] end");
-    Serial.println(List::lua.Lua_dostring(&declare_array));      
+    _size = 0;
+    listString = "";
+    seprator = '♫';
 }
 
 void List::add(String value)
 {
-    List:_size++;
-    List::set(value, List::_size);
+    _size++;
+    listString += String(value + seprator);
 }
 
 int List::size()
 {
-    return List::_size;
+    return _size;
 }
-
+char *List::getCharArray(int index){
+    String value = get(index); 
+    char res[sizeof(value)];
+    value.toCharArray(res,sizeof(value));
+    return res;
+}
 String List::get(int index)
 {
-    char get_from_array[200];
-    snprintf(get_from_array,sizeof(get_from_array),"tempString = getvalue(%i)",index);
-    String get_code = String(get_from_array);
-    Serial.println(List::lua.Lua_dostring(&get_code).c_str());
-    Serial.println(lua_getglobal(List::lua.get_lua_State(), "tempString"));
-    return lua_tostring(List::lua.get_lua_State(), -1);
+    if (index >= _size) 
+    {
+        return "";
+    }
+    
+    int currentIndex = 0;
+    int startIndex = 0;
+    for (int i = 1; i < listString.length(); i++)
+    {
+        if (listString.substring(i,i+1)==String(seprator))
+        {
+            if (currentIndex++ == index)
+            {
+                String res = listString.substring(startIndex,i);
+                res.trim();
+                return res;
+            }            
+            startIndex = i+1;
+        }        
+    }    
 }
 
 void List::set(String value, int index)
 {
-    char add_to_array[200];
-    snprintf(add_to_array,sizeof(add_to_array),"MyArray[%i] = '%s' print(MyArray[%i])", List::_size, value.c_str(), index);
-    String add_code = String(add_to_array);
-    Serial.println(List::lua.Lua_dostring(&add_code));
+    if (index >= _size) 
+    {
+        return;
+    }
+
+    int currentIndex = 0;
+    int startIndex = 1;
+    String tempListString=String(seprator);
+    for (int i = 1; i < listString.length(); i++)
+    {
+        if (listString.substring(i,i+1)==String(seprator))
+        {
+            if (currentIndex++ == index)
+            {
+                add(value);
+            }else{
+                add(listString.substring(startIndex,i));
+            }
+        }
+    }
 }

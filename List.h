@@ -8,7 +8,6 @@
 #define List_h
 
 #include "WString.h"
-#include <LuaWrapper.h>
 
 // include types & constants of Wiring core API
 class List
@@ -19,9 +18,11 @@ class List
     int size();
     void set(String value, int index);
     String get(int index);
+    char *getCharArray(int index);
   private:
-    LuaWrapper lua;
+    String listString;
     int _size;
+    char seprator;
 };
 
 #endif
