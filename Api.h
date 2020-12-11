@@ -4,28 +4,27 @@
 */
 
 // ensure this library description is only included once
-#ifndef Apis_h
-#define Apis_h
+#ifndef Api_h
+#define Api_h
 
 #include "WString.h"
 #include "List.h"
 
 // include types & constants of Wiring core API
-class Apis
+class Api
 {
   
   public:
-    Apis();
+    Api();
     void setName(String name);
-    String getName(int index);
-    void addInput(String input,int index);
-    int getInputSize(int index);
-    int getApiSize();
-    String getInput(int index, int apiIndex);
+    String getName();
+    void addInput(String input);
+    int getSize();
+    String getInput(int index);
+
   private:
-    List nameList;
-    List inputsList;
-    List inputIndex;
-    int api_count;
+    String name;
+    String inputs;
+    int inputIndex;
 };
 #endif

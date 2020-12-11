@@ -11,15 +11,18 @@
 #include <vfs.h>
 #include <SPI.h>
 #include <FS.h>
-
+#include <LuaWrapper.h>
+#include <ESP8266WebServer.h>
 // include types & constants of Wiring core API
 class LuaManager
 {
     public:
-        LuaManager();
+        LuaManager(ESP8266WebServer server);
         String getLuaCode();
+        void responseHtml(lua_State *lua);
     private:
         String file_open(char *path);
+        ESP8266WebServer server;
 };
 
 #endif

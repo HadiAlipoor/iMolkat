@@ -6,65 +6,18 @@
 #include <LuaWrapper.h>
 
 #include "DbManager.h"
+#include "Api.h"
 
 LuaWrapper lua_global;
 ESP8266WebServer server(80);
 String json_code;
 const char* deviceName = "iMolkat";
 
-class Api
-{
-  public:
-    Api(){
-      Api::inputIndex = 0;
-      Api::inputs = ",";
-    }
-    void setName(String name){
-      Api::name = name;
-    }
-    String getName(){
-      return Api::name;
-    }
-    void addInput(String input){
-      Api::inputs = Api::inputs + input + ",";
-      Api::inputIndex++;
-    }
-    int getSize(){
-      return Api::inputIndex;
-    }
-    String getInput(int index)
-    {
-      int indexCount = 0;
-      int start_index = 0;
-      for (int i = 0; i < Api::inputs.length()-1; i++)
-      {
-        if (Api::inputs.substring(i,i+1) == ",")
-        {
-          if (start_index == 0)
-          {
-            start_index = i + 1;
-          }
-          else
-          {
-            String input = Api::inputs.substring(start_index, i);
-            if (indexCount == index)
-            { 
-              return input;
-            }
-            indexCount++;
-          }
-        }
-      }
-    }
-
-  private:
-    String name;
-    String inputs;
-    int inputIndex;
-};
-
 Api apis[100];
 int api_count = 0;
+
+String api_name;
+char url_text[200];
 
 String httpGet(String url) {
   String payload ;
@@ -148,10 +101,10 @@ String getHtml() {
   return clientHtml;
 
 }
+
 void handleRoot() {
   server.send(200, "text/html", getHtml());
 }
-
 
 void responseHtml(lua_State *lua)
 {
@@ -269,16 +222,15 @@ void manageApis(String lua_code){
     }    
   }  
 }
-String api_name;
-char url_text[200];
+
 void setup() {
 
   SPIFFS.begin();
   SPIFFS.format();
-#ifndef STASSID
-#define STASSID "V20"
-#define STAPSK  "qazxsw21"
-#endif
+  #ifndef STASSID
+  #define STASSID "V20"
+  #define STAPSK  "qazxsw21"
+  #endif
 
   const char* ssid = STASSID;
   const char* password = STAPSK;
@@ -316,7 +268,7 @@ void setup() {
   }
   
 
-  // String lua_json = httpGet("http://192.168.43.136:84/json.lua");
+  String lua_json = httpGet("http://192.168.43.136:84/json.lua");
   String lua_code = httpGet("http://192.168.43.136:84/code.lua");
   lua_global.Lua_register("responseHtml", (const lua_CFunction) &responseHtml);
   lua_global.Lua_register("SelectQuery", (const lua_CFunction) &db_select);
@@ -326,7 +278,7 @@ void setup() {
   // lua_code = lua_json + "\n" + lua_code;
   // Serial.println(lua_code);
   
-  // Serial.println(lua_global.Lua_dostring(&lua_json));
+  Serial.println(lua_global.Lua_dostring(&lua_json));
   // luaL_openlibs(lua_global.get_lua_State());
   Serial.println(lua_global.Lua_dostring(&lua_code));
   manageApis(lua_code);
