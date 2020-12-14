@@ -85,3 +85,47 @@ void List::set(String value, int index)
         }
     }
 }
+
+String List::open_file(char *path) {
+    // Launch SPIFFS file system  
+    if(!SPIFFS.begin()){ 
+        Serial.println("An Error has occurred while mounting SPIFFS");  
+    }
+    Serial.printf("trying to open db file : %s\n",path);
+    File file = SPIFFS.open(path,"r"); 
+    if(!file){ 
+        Serial.println("Failed to open file for reading"); 
+        return "no_file"; 
+    }
+    return file.readString();
+}
+
+bool List::file_write(char *path) {
+    // Launch SPIFFS file system  
+    if(!SPIFFS.begin()){ 
+        Serial.println("An Error has occurred while mounting SPIFFS");  
+    }
+    Serial.printf("in file_write : %s ; text : %s\n$$END_TEXT\n",path, listString.c_str());
+    File file = SPIFFS.open(path,"w"); 
+    if(!file){ 
+        Serial.println("Failed to open file for reading"); 
+        return false; 
+    } 
+    
+    file.print(listString);
+    file.close();
+    return true;
+}
+
+bool List::saveInFile(char *path){
+    return file_write(path);
+}
+bool List::loadFromFile(char *path){
+    String fileContent = open_file(path);;
+    if(fileContent != "no_file"){
+        listString = fileContent;
+        return true;
+    }else{
+        return false;
+    }
+}

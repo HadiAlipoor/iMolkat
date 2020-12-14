@@ -8,6 +8,9 @@
 #define List_h
 
 #include "WString.h"
+#include <vfs.h>
+#include <SPI.h>
+#include <FS.h>
 
 // include types & constants of Wiring core API
 class List
@@ -19,10 +22,14 @@ class List
     void set(String value, int index);
     String get(int index);
     char *getCharArray(int index);
+    bool saveInFile(char *path);
+    bool loadFromFile(char *path);
   private:
     String listString;
     int _size;
     char seprator;
+    bool file_write(char *path);
+    String open_file(char *path);
 };
 
 #endif

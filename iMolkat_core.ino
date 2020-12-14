@@ -122,14 +122,35 @@ void responseHtmllua(lua_State *lua)
   
   server.send(200, "text/html", msg);
 }
-
 void responseHtml(String msg)
 {
   server.sendHeader("Access-Control-Max-Age", "10000");
   server.sendHeader("Access-Control-Allow-Methods", "POST,GET,OPTIONS");
   server.sendHeader("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
   server.sendHeader("Access-Control-Allow-Origin", "*");
+  
   server.send(200, "text/html", msg);
+}
+void responseFile(String path)
+{
+  if(!SPIFFS.begin()){ 
+        Serial.println("An Error has occurred while mounting SPIFFS");  
+    }
+
+    File file = SPIFFS.open(path,"r"); 
+    if(!file){ 
+        Serial.println("Failed to open file for sending"); 
+    }
+  server.sendHeader("Access-Control-Max-Age", "10000");
+  server.sendHeader("Access-Control-Allow-Methods", "POST,GET,OPTIONS");
+  server.sendHeader("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
+  server.sendHeader("Access-Control-Allow-Origin", "*");
+  
+  server.streamFile(file,"text/html");
+    file.close();
+    
+    // Serial.println(text);
+    SPIFFS.end();
 }
 
 void handleNotFound() {
@@ -264,6 +285,7 @@ void getApp(String url){
     String  filePath = urlPath;
     filePath.replace("http://192.168.43.136:84/react","");
     filePath.replace("http://192.168.43.136:84","");
+    delay(5);
     Serial.printf("download %s result : %d\n",filePath.c_str(), fileManager.downloadFileToSpiffs(urlPath, filePath));
   }
     SPIFFS.info(fsinfo);
@@ -275,7 +297,7 @@ void handleFileServer(){
 
   Serial.printf("url : %s\n", uri.c_str());
   
-  responseHtml(fileManager.openFile(uri));
+  responseFile(uri);
 
 }
 void manageFileServer(){
@@ -288,12 +310,31 @@ void manageFileServer(){
     Serial.printf("file : %s\n",files.get(i).c_str());
     server.on(files.get(i), handleFileServer);    
   }
+  server.on("/format",[]{fileManager.format();responseHtml("formated");});
+  server.on("/getapp",[]{getApp("http://192.168.43.136:84/app.json");;responseHtml("app installed");});
+  server.on("/resetfs",[]{manageFileServer();responseHtml("server reseted");});
+  server.on("/files",[]{if(!SPIFFS.begin()){ 
+        Serial.println("An Error has occurred while mounting SPIFFS");  
+    }
+    List files = List();
+    
+    Dir dir = SPIFFS.openDir("/");
+    String fileLists="";
+    while (dir.next()) {    
+        String fileName = dir.fileName();
+        Serial.printf("fileName : %s, fileSize: %d\n",fileName.c_str(),dir.fileSize());
+        // fileLists = String()
+        files.add(fileName);
+    }
+    SPIFFS.end();
+    responseHtml("printed");
+    });
   
 }
 
 void setup() {
   SPIFFS.begin();
-  SPIFFS.format();
+  // SPIFFS.format();
   fileManager  = FileManager();
   #ifndef STASSID
   #define STASSID "V20"
@@ -372,8 +413,8 @@ void setup() {
   });
   // DbManager dbManager = DbManager("MyTest");
   // dbManager.ExecuteQuery("create table myTable(id, title)");
-  getApp("http://192.168.43.136:84/app.json");
-  Serial.println("getting App finished.***********************************************************************************");
+
+  // Serial.println("getting App finished.***********************************************************************************");
   manageFileServer();
 
   server.onNotFound(handleNotFound);
@@ -383,12 +424,15 @@ void setup() {
   String run_setup = String("Setup()");
   Serial.println(lua_global.Lua_dostring(&run_setup));
   Serial.printf("true value is %d\n",true);
+  Serial.println(String(ESP.getFreeHeap()));
+
 }
 
 
 void loop(void) {
-  String run_loop = String("Loop()");
-  lua_global.Lua_dostring(&run_loop);
+  // String run_loop = String("Loop()");
+  // lua_global.Lua_dostring(&run_loop);
+  // Serial.println(String(ESP.getFreeHeap()));
   
   server.handleClient();
   MDNS.update();

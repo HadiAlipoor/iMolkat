@@ -22,13 +22,17 @@
 class FileManager{
     public:
         FileManager();
-        String openFile(String path);
+        char *openFile(String path);
         bool writeFile(String path, String text);
         List getFolderFiles(char *path);
         bool format();
-        int downloadFileToSpiffs(String url, String filename);
+        int downloadFileToSpiffs(String url, String fileName);
+        bool downloadFile(String url, String filename);
     private:
-        DbManager dbManager = DbManager();
+        List fileNameList= List();
+        List fileTitleList= List();
+        void saveToFile();
+        void loadFromFile();
         String getFileName(String title);
         String getNewFileName(String title);
 };

@@ -2,27 +2,18 @@
 
 FileManager::FileManager()
 {
-    dbManager.initialize("FileManager");
-    dbManager.ExecuteQuery("create table files(id, fileName, title)");
+    loadFromFile();
 }
 
 String FileManager::getFileName(String title){
-    DynamicJsonDocument doc(2048);
-    doc = dbManager.SelectQuery("select * from files");
-    Serial.printf("in getFileName with Title : %s ; doc size : %d\n",title.c_str(),doc["rows"].size());
-    if(doc["rows"].size() > 0){
-        JsonArray files = doc["rows"].as<JsonArray>();
-        for(JsonObject file : files){
-            if (file["title"] == title)
-            {
-                Serial.printf("in getFileName FileName : %s\n",file["FileName"].as<String>().c_str());
-
-                return file["FileName"].as<String>();
-            }        
+    for (int i = 0; i < fileTitleList.size(); i++)
+    {
+        if (fileTitleList.get(i) == title)
+        {
+            return fileNameList.get(i);
         }
-    }
-    Serial.printf("in getFileName returns NULL\n");
-
+        
+    }    
     return "";
 }
 
@@ -31,25 +22,39 @@ String FileManager::getNewFileName(String title){
     Serial.printf("in getNewFileName fileName = %s\n",title.c_str());
     if (fileName == "")
     {
-        int id = dbManager.GetMaxId("files")+1;
-        
-        
-        char sql[100];
-        Serial.println("befor sprintf in getNewFileName");
-        sprintf (sql , "insert into files (id, fileName, title) values (%d ,%d , %s )",id, id, title.c_str());
-        Serial.println("after sprintf in getNewFileName");
-        if(dbManager.ExecuteQuery(sql)){
-            Serial.printf("getNewFileName: %d\n", id);
-            return String(id);
-        }else{
-            return "error";
+        int maxId = 0;
+        for (int i = 0; i < fileNameList.size(); i++)
+        {
+            if (fileNameList.get(i).toInt() > maxId)
+            {
+                maxId = fileNameList.get(i).toInt();
+            }
+            
         }
+        
+        maxId++;
+        
+        fileNameList.add(String(maxId));
+        fileTitleList.add(title);
+        saveToFile();
+        return String(maxId);
     }else{
         return fileName;
     }
 }
 
-String FileManager::openFile(String path) {
+void FileManager::loadFromFile(){
+    fileNameList.loadFromFile("/FileName.db");
+    fileTitleList.loadFromFile("/FileTitle.db");
+}
+
+void FileManager::saveToFile(){
+    fileNameList.saveInFile("/FileName.db");
+    fileTitleList.saveInFile("/FileTitle.db");
+}
+
+
+char *FileManager::openFile(String path) {
     // path.replace('.',dotReplacedChar);
     // Launch SPIFFS file system  
 
@@ -57,12 +62,20 @@ String FileManager::openFile(String path) {
         Serial.println("An Error has occurred while mounting SPIFFS");  
     }
 
-    File file = SPIFFS.open(getFileName(path),"r"); 
+    File file = SPIFFS.open(path,"r"); 
     if(!file){ 
         Serial.println("Failed to open file for reading"); 
         return "no_file"; 
     }
-    String text = file.readString();
+    char text[file.size()+10];
+    int index = 0;
+    while (file.available())
+    {
+        text[index++] = char(file.read());
+    }
+    text[index] = '\0';
+    file.close();
+    
     Serial.println(text);
     SPIFFS.end();
     return text;
@@ -80,7 +93,7 @@ bool FileManager::writeFile(String path, String text) {
 
     File file = SPIFFS.open(getNewFileName(path),"w"); 
     if(!file){ 
-        Serial.println("Failed to open file for reading"); 
+        Serial.println("Failed to open file for writing"); 
         return false; 
     } else{
         
@@ -96,24 +109,13 @@ List FileManager::getFolderFiles(char *path){
     if(!SPIFFS.begin()){ 
         Serial.println("An Error has occurred while mounting SPIFFS");  
     }
-    DynamicJsonDocument doc(2048);
-    doc = dbManager.SelectQuery("select * from files");
-    JsonArray filesArray = doc["rows"].as<JsonArray>();
-
-    
-
     List files = List();
     
     Dir dir = SPIFFS.openDir(path);
     while (dir.next()) {    
         String fileName = dir.fileName();
-        for(JsonObject file : filesArray){
-            if (file["fileName"].as<String>() == fileName && file["title"].as<String>().substring(0,sizeof(path)) == path)
-            {
-                Serial.printf("open FileName: %s\n",fileName.c_str());
-                files.add(file["title"].as<String>());
-            }        
-        }    
+        Serial.printf("in getFolderFiles, fileName : %s\n",fileName.c_str());
+        files.add(fileName);
     }
     SPIFFS.end();
     return files;
@@ -133,12 +135,13 @@ bool FileManager::format(){
 int FileManager::downloadFileToSpiffs(String url, String filename)
 {
   Serial.printf("url in download File : %s\n",url.c_str());
-  bool res = false;
+  bool res = true;
   //Check WiFi connection status
   if (WiFi.status() == WL_CONNECTED) {
     WiFiClient client;
 
     HTTPClient http;
+    http.setTimeout(10000);
     if (http.begin(client, url.c_str())) {  // HTTP
       // start connection and send HTTP header
       int httpCode = http.GET();
@@ -148,14 +151,28 @@ int FileManager::downloadFileToSpiffs(String url, String filename)
         // file found at server
         if (httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_MOVED_PERMANENTLY) {
           SPIFFS.begin();
-          Serial.printf("before getNewFileName\n");
-          String _fileName = getNewFileName(filename);
-          Serial.printf("_fileName : %s \n",filename.c_str());
-          File file = SPIFFS.open(_fileName,"w");
-          res = http.writeToStream(&file);
-          Serial.printf("result of writing %s into spiffs : %d; size : %d\n",filename.c_str() ,res,http.getSize());
-          file.close();
-          SPIFFS.end();
+          Serial.printf("before open file :%s\n", filename.c_str());
+        //   String _fileName = getNewFileName(filename);
+        //   Serial.printf("_fileName : %s \n",_fileName.c_str());
+          File file = SPIFFS.open(filename,"w");
+          Serial.printf("file opened. going to write %d byte.\n",http.getSize());
+        if (file) {
+            http.begin(url);
+            int httpCode = http.GET();
+            if (httpCode > 0) {
+                if (httpCode == HTTP_CODE_OK) {
+                    http.writeToStream(&file);
+                }
+            } else {
+                Serial.printf("[HTTP] GET... failed, error: %s\n", http.errorToString(httpCode).c_str());
+            }
+            // file.close();
+            }
+            http.end();        
+        //   res = http.writeToStream(&file.w);
+        //   Serial.printf("result of writing %s with name %s into spiffs : %d; size : %d\n",filename.c_str(),file.fullName() ,res,http.getSize());
+        //   file.close();
+        //   SPIFFS.end();
         }
       } else {
         Serial.printf("[HTTP] GET... failed, error: %s\n", http.errorToString(httpCode).c_str());
@@ -174,3 +191,70 @@ int FileManager::downloadFileToSpiffs(String url, String filename)
     return false;
   }
 }
+
+
+
+bool FileManager::downloadFile(String url, String fileName)
+{
+   
+ SPIFFS.begin();
+  HTTPClient http;
+
+  Serial.println("[HTTP] begin...\n");
+  Serial.println(fileName);
+  Serial.println(url);
+  http.begin(url);
+ 
+  Serial.printf("[HTTP] GET...\n", url.c_str());
+  // start connection and send HTTP header
+  int httpCode = http.GET();
+  if(httpCode > 0) {
+      // HTTP header has been send and Server response header has been handled
+      Serial.printf("[HTTP] GET... code: %d\n", httpCode);
+      Serial.printf("[FILE] open file for writing %s whith size : %d\n", fileName.c_str(),http.getSize());
+     
+      File file = SPIFFS.open(fileName, "w");
+
+      // file found at server
+      if(httpCode == HTTP_CODE_OK) {
+
+          // get lenght of document (is -1 when Server sends no Content-Length header)
+          int len = http.getSize();
+
+          // create buffer for read
+          uint8_t buff[1280] = { 0 };
+
+          // get tcp stream
+          WiFiClient * stream = http.getStreamPtr();
+
+          // read all data from server
+          while(http.connected() && (len > 0 || len == -1)) {
+              // get available data size
+              size_t size = stream->available();
+              if(size) {
+                  // read up to 128 byte
+                  int c = stream->readBytes(buff, ((size > sizeof(buff)) ? sizeof(buff) : size));
+                  // write it to Serial
+                  //Serial.write(buff, c);
+                  file.write(buff, c);
+                  if(len > 0) {
+                      len -= c;
+                  }
+              }
+              delay(1);
+          }
+
+          Serial.println();
+          Serial.println("[HTTP] connection closed or file end.\n");
+          Serial.println("[FILE] closing file\n");
+          file.close();
+         
+      }
+     
+  }
+  http.end();
+
+ 
+
+}
+
