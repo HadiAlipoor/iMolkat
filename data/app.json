@@ -1,0 +1,22 @@
+{
+    "files":[
+        "http://localhost:84/asset-manifest.json",
+        "http://localhost:84/favicon.ico",
+        "http://localhost:84/index.html",
+        "http://localhost:84/logo192.png",
+        "http://localhost:84/logo512.png",
+        "http://localhost:84/manifest.json",
+        "http://localhost:84/robots.txt",
+        "http://localhost:84/static/css/main.e2ba8cb8.chunk.css",
+        "http://localhost:84/static/css/main.e2ba8cb8.chunk.css.map",
+        "http://localhost:84/static/js/2.f148a073.chunk.js",
+        "http://localhost:84/static/js/2.f148a073.chunk.js.LICENSE.txt",
+        "http://localhost:84/static/js/2.f148a073.chunk.js.map",
+        "http://localhost:84/static/js/3.eb7994e0.chunk.js",
+        "http://localhost:84/static/js/3.eb7994e0.chunk.js.map",
+        "http://localhost:84/static/js/main.d879da64.chunk.js",
+        "http://localhost:84/static/js/main.d879da64.chunk.js.map",
+        "http://localhost:84/static/js/runtime-main.1963f4bf.js",
+        "http://localhost:84/runtime-main.1963f4bf.js.map"
+    ]
+}

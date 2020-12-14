@@ -12,17 +12,24 @@
 #include <SPI.h>
 #include <FS.h>
 #include "List.h"
+#include <ESP8266HTTPClient.h>
+#include <ESP8266WiFi.h>
+#include <WiFiClient.h>
+#include <ESP8266WebServer.h>
+#include <ESP8266mDNS.h>
+#include "DbManager.h"
 
 class FileManager{
     public:
         FileManager();
-        String openFile(char *path);
-        bool writeFile(char *path, String text);
+        String openFile(String path);
+        bool writeFile(String path, String text);
         List getFolderFiles(char *path);
-        List getFolderAllFiles(char *path);
         bool format();
-        List getFolders(char *path);
+        int downloadFileToSpiffs(String url, String filename);
     private:
-
+        DbManager dbManager = DbManager();
+        String getFileName(String title);
+        String getNewFileName(String title);
 };
 #endif

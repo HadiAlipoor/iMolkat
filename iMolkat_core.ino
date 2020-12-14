@@ -7,9 +7,12 @@
 
 #include "DbManager.h"
 #include "Api.h"
+#include "FileManager.h"
 
 LuaWrapper lua_global;
 ESP8266WebServer server(80);
+FileManager fileManager;
+
 String json_code;
 const char* deviceName = "iMolkat";
 
@@ -20,6 +23,7 @@ String api_name;
 char url_text[200];
 
 String httpGet(String url) {
+  Serial.printf("url in httpGet : %s\n",url.c_str());
   String payload ;
   //Check WiFi connection status
   if (WiFi.status() == WL_CONNECTED) {
@@ -44,7 +48,7 @@ String httpGet(String url) {
       http.end();
       return payload;
     } else {
-      Serial.printf("[HTTP} Unable to connect\n");
+      Serial.printf("[HTTP} Unable to connect: %s\n",url.c_str());
       return "HTTP Unable to connect";
     }
   }
@@ -71,7 +75,8 @@ bool db_select(lua_State *lua){
   Serial.println(sql);
   Serial.println(sql);
 
-  DbManager dbManager = DbManager(dbName);
+  DbManager dbManager = DbManager();
+  dbManager.initialize("dbName");
   DynamicJsonDocument doc(1024);
   doc = dbManager.SelectQuery(sql);
   
@@ -90,8 +95,9 @@ bool db_exec(lua_State *lua){
   const char* sql = luaL_checklstring(lua, 2, lsql);
   Serial.println(sql);
 
-  DbManager dbManager = DbManager(dbName);
-  return dbManager.ExecuteQuery(sql);
+  DbManager dbManager = DbManager();
+  dbManager.initialize("dbName");
+  return dbManager.ExecuteQuery("sql");
 }
 
 String getHtml() {
@@ -106,9 +112,19 @@ void handleRoot() {
   server.send(200, "text/html", getHtml());
 }
 
-void responseHtml(lua_State *lua)
+void responseHtmllua(lua_State *lua)
 {
   String msg = String(luaL_checkstring(lua, 1));
+  server.sendHeader("Access-Control-Max-Age", "10000");
+  server.sendHeader("Access-Control-Allow-Methods", "POST,GET,OPTIONS");
+  server.sendHeader("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
+  server.sendHeader("Access-Control-Allow-Origin", "*");
+  
+  server.send(200, "text/html", msg);
+}
+
+void responseHtml(String msg)
+{
   server.sendHeader("Access-Control-Max-Age", "10000");
   server.sendHeader("Access-Control-Allow-Methods", "POST,GET,OPTIONS");
   server.sendHeader("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
@@ -223,10 +239,62 @@ void manageApis(String lua_code){
   }  
 }
 
-void setup() {
 
+
+void Log(String message){
+  Serial.printf("Log: %s\n", message.c_str());
+}
+void errLog(String message){
+  Serial.printf("error log : %s", message.c_str());
+}
+
+void getApp(String url){
+ FSInfo fsinfo;
+    SPIFFS.info(fsinfo);
+    Serial.printf("fsinfo.blockSize: %d,fsinfo.maxOpenFiles: %d,fsinfo.maxPathLength: %d,fsinfo.pageSize: %d,fsinfo.totalBytes: %d,fsinfo.usedBytes: %d",fsinfo.blockSize,fsinfo.maxOpenFiles,fsinfo.maxPathLength,fsinfo.pageSize,fsinfo.totalBytes,fsinfo.usedBytes); 
+  String fileConfig = httpGet(url);
+  Serial.println(fileConfig);
+  DynamicJsonDocument configDoc(1024);
+  
+  deserializeJson(configDoc, fileConfig);
+  JsonArray filesJsonArrays = configDoc["files"].as<JsonArray>();
+  Serial.printf("jsonarray size : %d\n",filesJsonArrays.size());
+  for(String urlPath : filesJsonArrays) {
+    Serial.println(urlPath);
+    String  filePath = urlPath;
+    filePath.replace("http://192.168.43.136:84/react","");
+    filePath.replace("http://192.168.43.136:84","");
+    Serial.printf("download %s result : %d\n",filePath.c_str(), fileManager.downloadFileToSpiffs(urlPath, filePath));
+  }
+    SPIFFS.info(fsinfo);
+    Serial.printf("fsinfo.blockSize: %d,fsinfo.maxOpenFiles: %d,fsinfo.maxPathLength: %d,fsinfo.pageSize: %d,fsinfo.totalBytes: %d,fsinfo.usedBytes: %d",fsinfo.blockSize,fsinfo.maxOpenFiles,fsinfo.maxPathLength,fsinfo.pageSize,fsinfo.totalBytes,fsinfo.usedBytes); 
+}
+
+void handleFileServer(){
+  String uri = server.uri();
+
+  Serial.printf("url : %s\n", uri.c_str());
+  
+  responseHtml(fileManager.openFile(uri));
+
+}
+void manageFileServer(){
+
+  List files = fileManager.getFolderFiles("/");
+
+  Serial.printf("files count : %d", files.size());
+  for (int i = 0; i < files.size(); i++)
+  {
+    Serial.printf("file : %s\n",files.get(i).c_str());
+    server.on(files.get(i), handleFileServer);    
+  }
+  
+}
+
+void setup() {
   SPIFFS.begin();
   SPIFFS.format();
+  fileManager  = FileManager();
   #ifndef STASSID
   #define STASSID "V20"
   #define STAPSK  "qazxsw21"
@@ -268,9 +336,9 @@ void setup() {
   }
   
 
-  String lua_json = httpGet("http://192.168.43.136:84/json.lua");
+  // String lua_json = httpGet("http://192.168.43.136:84/json.lua");
   String lua_code = httpGet("http://192.168.43.136:84/code.lua");
-  lua_global.Lua_register("responseHtml", (const lua_CFunction) &responseHtml);
+  lua_global.Lua_register("responseHtml", (const lua_CFunction) &responseHtmllua);
   lua_global.Lua_register("SelectQuery", (const lua_CFunction) &db_select);
   lua_global.Lua_register("ExecuteQuery", (const lua_CFunction) &db_exec);
   lua_global.Lua_register("tostring", (const lua_CFunction) &ConvertInttoString);
@@ -278,7 +346,7 @@ void setup() {
   // lua_code = lua_json + "\n" + lua_code;
   // Serial.println(lua_code);
   
-  Serial.println(lua_global.Lua_dostring(&lua_json));
+  // Serial.println(lua_global.Lua_dostring(&lua_json));
   // luaL_openlibs(lua_global.get_lua_State());
   Serial.println(lua_global.Lua_dostring(&lua_code));
   manageApis(lua_code);
@@ -302,7 +370,11 @@ void setup() {
     Serial.println(param + " = " + value);
     // handleAPI(param, value);
   });
-
+  // DbManager dbManager = DbManager("MyTest");
+  // dbManager.ExecuteQuery("create table myTable(id, title)");
+  getApp("http://192.168.43.136:84/app.json");
+  Serial.println("getting App finished.***********************************************************************************");
+  manageFileServer();
 
   server.onNotFound(handleNotFound);
 
@@ -310,6 +382,7 @@ void setup() {
   Serial.println("HTTP server started");
   String run_setup = String("Setup()");
   Serial.println(lua_global.Lua_dostring(&run_setup));
+  Serial.printf("true value is %d\n",true);
 }
 
 
