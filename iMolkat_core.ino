@@ -4,6 +4,7 @@
 #include <ESP8266WebServer.h>
 #include <ESP8266mDNS.h>
 #include <LuaWrapper.h>
+#include <WiFiManager.h>
 
 #include "DbManager.h"
 #include "Api.h"
@@ -283,10 +284,10 @@ void getApp(String url){
   for(String urlPath : filesJsonArrays) {
     Serial.println(urlPath);
     String  filePath = urlPath;
-    filePath.replace("http://192.168.43.136:84/react","");
-    filePath.replace("http://192.168.43.136:84","");
+    filePath.replace("http://www.imolkat.com/react","");
+    filePath.replace("http://www.imolkat.com","");
     delay(5);
-    Serial.printf("download %s result : %d\n",filePath.c_str(), fileManager.downloadFileToSpiffs(urlPath, filePath));
+    Serial.printf("download %s result : %d\n",filePath.c_str(), fileManager.downloadFile(urlPath, filePath));
   }
     SPIFFS.info(fsinfo);
     Serial.printf("fsinfo.blockSize: %d,fsinfo.maxOpenFiles: %d,fsinfo.maxPathLength: %d,fsinfo.pageSize: %d,fsinfo.totalBytes: %d,fsinfo.usedBytes: %d",fsinfo.blockSize,fsinfo.maxOpenFiles,fsinfo.maxPathLength,fsinfo.pageSize,fsinfo.totalBytes,fsinfo.usedBytes); 
@@ -311,7 +312,7 @@ void manageFileServer(){
     server.on(files.get(i), handleFileServer);    
   }
   server.on("/format",[]{fileManager.format();responseHtml("formated");});
-  server.on("/getapp",[]{getApp("http://192.168.43.136:84/app.json");;responseHtml("app installed");});
+  server.on("/getapp",[]{getApp("http://www.imolkat.com/app.json");responseHtml("app installed");});
   server.on("/resetfs",[]{manageFileServer();responseHtml("server reseted");});
   server.on("/files",[]{if(!SPIFFS.begin()){ 
         Serial.println("An Error has occurred while mounting SPIFFS");  
@@ -336,6 +337,18 @@ void setup() {
   SPIFFS.begin();
   // SPIFFS.format();
   fileManager  = FileManager();
+
+  WiFiManager wifiManager;
+  //Static IP address configuration
+  IPAddress staticIP(192, 168, 1, 60); //ESP static ip
+  IPAddress gateway(192, 168, 1, 1);   //IP Address of your WiFi Router (Gateway)
+  IPAddress subnet(255, 255, 0, 0);
+  IPAddress primaryDNS(8, 8, 8, 8);   //optional
+  IPAddress secondaryDNS(8, 8, 4, 4); //optional
+  
+  wifiManager.setSTAStaticIPConfig(staticIP, gateway, subnet, primaryDNS);
+
+  wifiManager.autoConnect("DIAKO_AP");
   #ifndef STASSID
   #define STASSID "V20"
   #define STAPSK  "qazxsw21"
@@ -344,41 +357,36 @@ void setup() {
   const char* ssid = STASSID;
   const char* password = STAPSK;
 
-  //Static IP address configuration
-  IPAddress staticIP(192, 168, 43, 67); //ESP static ip
-  IPAddress gateway(192, 168, 43, 1);   //IP Address of your WiFi Router (Gateway)
-  IPAddress subnet(255, 255, 0, 0);
-  IPAddress primaryDNS(8, 8, 8, 8);   //optional
-  IPAddress secondaryDNS(8, 8, 4, 4); //optional
 
   Serial.begin(115200);
 
 
-  WiFi.hostname(deviceName);      // DHCP Hostname (useful for finding device for static lease)local_
-  if (!WiFi.config(staticIP, gateway, subnet, primaryDNS, secondaryDNS)) {
-    Serial.println("STA Failed to configure");
-  }
-  WiFi.mode(WIFI_STA);
-  WiFi.begin(ssid, password);
+//  WiFi.hostname(deviceName);      // DHCP Hostname (useful for finding device for static lease)local_
+//  if (!WiFi.config(staticIP, gateway, subnet, primaryDNS, secondaryDNS)) {
+//    Serial.println("STA Failed to configure");
+//  }
+//  WiFi.mode(WIFI_STA);
+//  WiFi.begin(ssid, password);
+//
+//  // Wait for connection
+//  while (WiFi.status() != WL_CONNECTED) {
+//    delay(500);
+//    Serial.print(".");
+//  }
+//  Serial.println("");
+//  Serial.print("Connected to ");
+//  Serial.println(ssid);
+//  Serial.print("IP address: ");
+//  Serial.println(WiFi.localIP());
+//
+//  if (MDNS.begin("esp8266")) {
+//    Serial.println("MDNS responder started");
+//  }
+//  
 
-  // Wait for connection
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
-  }
-  Serial.println("");
-  Serial.print("Connected to ");
-  Serial.println(ssid);
-  Serial.print("IP address: ");
-  Serial.println(WiFi.localIP());
-
-  if (MDNS.begin("esp8266")) {
-    Serial.println("MDNS responder started");
-  }
-  
-
-  // String lua_json = httpGet("http://192.168.43.136:84/json.lua");
-  String lua_code = httpGet("http://192.168.43.136:84/code.lua");
+  // String lua_json = httpGet("http://www.imolkat.com/json.lua");
+  String lua_code = httpGet("http://www.imolkat.com/code.lua");
+  Serial.println(lua_code);
   lua_global.Lua_register("responseHtml", (const lua_CFunction) &responseHtmllua);
   lua_global.Lua_register("SelectQuery", (const lua_CFunction) &db_select);
   lua_global.Lua_register("ExecuteQuery", (const lua_CFunction) &db_exec);
@@ -413,6 +421,7 @@ void setup() {
   });
   // DbManager dbManager = DbManager("MyTest");
   // dbManager.ExecuteQuery("create table myTable(id, title)");
+  getApp("http://www.imolkat.com/app.json");
 
   // Serial.println("getting App finished.***********************************************************************************");
   manageFileServer();
