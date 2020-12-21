@@ -17,7 +17,7 @@ FileManager fileManager;
 String json_code;
 const char* deviceName = "iMolkat";
 
-Api apis[100];
+Api apis[10];
 int api_count = 0;
 
 String api_name;
@@ -332,7 +332,11 @@ void manageFileServer(){
     });
   
 }
-
+int lua_digitalRead(lua_State *lua){
+  int value = digitalRead(luaL_checkinteger(lua,0));
+  lua_pushinteger(lua,value);
+  return 1;
+}
 void setup() {
   SPIFFS.begin();
   // SPIFFS.format();
@@ -340,7 +344,7 @@ void setup() {
 
   WiFiManager wifiManager;
   //Static IP address configuration
-  IPAddress staticIP(192, 168, 1, 60); //ESP static ip
+  IPAddress staticIP(192, 168, 1, 61); //ESP static ip
   IPAddress gateway(192, 168, 1, 1);   //IP Address of your WiFi Router (Gateway)
   IPAddress subnet(255, 255, 0, 0);
   IPAddress primaryDNS(8, 8, 8, 8);   //optional
@@ -348,10 +352,10 @@ void setup() {
   
   wifiManager.setSTAStaticIPConfig(staticIP, gateway, subnet, primaryDNS);
 
-  wifiManager.autoConnect("DIAKO_AP");
+  wifiManager.autoConnect("DIACO_AP");
   #ifndef STASSID
-  #define STASSID "V20"
-  #define STAPSK  "qazxsw21"
+  #define STASSID "Molkat"
+  #define STAPSK  "Bo!2bjaq"
   #endif
 
   const char* ssid = STASSID;
@@ -391,6 +395,7 @@ void setup() {
   lua_global.Lua_register("SelectQuery", (const lua_CFunction) &db_select);
   lua_global.Lua_register("ExecuteQuery", (const lua_CFunction) &db_exec);
   lua_global.Lua_register("tostring", (const lua_CFunction) &ConvertInttoString);
+  lua_global.Lua_register("digitalRead", (const lua_CFunction) &lua_digitalRead);
   // Serial.println(lua_global.Lua_dostring(&lua_json));
   // lua_code = lua_json + "\n" + lua_code;
   // Serial.println(lua_code);
