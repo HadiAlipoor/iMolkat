@@ -1,27 +1,34 @@
+
+
+// #include "iMolkatWebServer.h"
+#include "TouchKey.h"
+// #include "FileManager.h"
+
+
+
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #include <ESP8266HTTPClient.h>
 #include <ESP8266WiFi.h>
 #include <WiFiClient.h>
 #include <ESP8266WebServer.h>
 #include <ESP8266mDNS.h>
-#include <LuaWrapper.h>
 #include <WiFiManager.h>
 
 #include "DbManager.h"
-#include "Api.h"
 #include "FileManager.h"
 
-LuaWrapper lua_global;
+
 ESP8266WebServer server(80);
+
 FileManager fileManager;
 
-String json_code;
 const char* deviceName = "iMolkat";
 
-Api apis[10];
-int api_count = 0;
+// typedef std::function<void(void)> iHandlerFunction;
+int dgtlrd;
 
-String api_name;
-char url_text[200];
+String deviceIP;
 
 String httpGet(String url) {
   Serial.printf("url in httpGet : %s\n",url.c_str());
@@ -59,48 +66,6 @@ String httpGet(String url) {
   }
 }
 
-int ConvertInttoString(lua_State *lua){
-  const char *str = String(luaL_checkinteger(lua, 1)).c_str();
-  // str = "HAddiii";
-  lua_pushstring(lua, str); //str is the const char* that points to your string
-  return 1; //we are returning one value, the string
-}
-
-bool db_select(lua_State *lua){
-  Serial.println("HEREEEE");
-  size_t *ldn;
-  size_t *lsql;
-  const char* dbName =  luaL_checklstring(lua, 1, ldn);
-  const char* sql = luaL_checklstring(lua, 2, lsql);
-  Serial.println("HEREEEE444444444444");
-  Serial.println(sql);
-  Serial.println(sql);
-
-  DbManager dbManager = DbManager();
-  dbManager.initialize("dbName");
-  DynamicJsonDocument doc(1024);
-  doc = dbManager.SelectQuery(sql);
-  
-  String res;
-  serializeJson(doc, res);
-  Serial.printf("end of db_select: %s",res.c_str());
-  lua_pushstring(lua, res.c_str());
-  
-  return 1;
-}
-
-bool db_exec(lua_State *lua){
-  size_t *ldn;
-  size_t *lsql;
-  const char* dbName =  luaL_checklstring(lua, 1, ldn);
-  const char* sql = luaL_checklstring(lua, 2, lsql);
-  Serial.println(sql);
-
-  DbManager dbManager = DbManager();
-  dbManager.initialize("dbName");
-  return dbManager.ExecuteQuery("sql");
-}
-
 String getHtml() {
   String deviceIP = WiFi.localIP().toString();
 
@@ -110,19 +75,11 @@ String getHtml() {
 }
 
 void handleRoot() {
-  server.send(200, "text/html", getHtml());
+  server.sendHeader("Location", "http://www.imolkat.com/panel/",true); //Redirect to our html web page 
+  server.send(302, "text/plane",""); 
 }
 
-void responseHtmllua(lua_State *lua)
-{
-  String msg = String(luaL_checkstring(lua, 1));
-  server.sendHeader("Access-Control-Max-Age", "10000");
-  server.sendHeader("Access-Control-Allow-Methods", "POST,GET,OPTIONS");
-  server.sendHeader("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
-  server.sendHeader("Access-Control-Allow-Origin", "*");
-  
-  server.send(200, "text/html", msg);
-}
+
 void responseHtml(String msg)
 {
   server.sendHeader("Access-Control-Max-Age", "10000");
@@ -137,7 +94,18 @@ void responseFile(String path)
   if(!SPIFFS.begin()){ 
         Serial.println("An Error has occurred while mounting SPIFFS");  
     }
-
+  String mime_type = "";
+  Serial.println(path.substring(path.length()-4,path.length()));
+  if (path.substring(path.length()-4,path.length()) == String(".css"))
+  {
+    mime_type = "text/css";
+  }else if (path.substring(path.length()-5,path.length()) == ".html")
+  {
+    mime_type = "text/html";
+  }else{
+    mime_type = "text/html";
+  }
+  
     File file = SPIFFS.open(path,"r"); 
     if(!file){ 
         Serial.println("Failed to open file for sending"); 
@@ -147,7 +115,7 @@ void responseFile(String path)
   server.sendHeader("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
   server.sendHeader("Access-Control-Allow-Origin", "*");
   
-  server.streamFile(file,"text/html");
+  server.streamFile(file,mime_type);
     file.close();
     
     // Serial.println(text);
@@ -172,103 +140,56 @@ void handleNotFound() {
 
 void handleAPI()
 {
-  String api_name=server.uri().substring(5);
-  String inputs_string = "";
-  Serial.println(api_name);
-  int output = server.args();
-  // struct Argument
-  // {
-  //   String value;
-  //   String parameter;
-  // };
-  // Argument arguments[100];
-  // for (int j = 0; j < output; j++)
-  // {
-  //   Argument argg;
-  //   argg.parameter = server.argName(j);
-  //   argg.value = server.arg(j);
-  //   Serial.println(argg.parameter + " = " + argg.value);
-  //   arguments[j] = argg;
-  // }
-  // for (int i = 0; i < sizeof(apis); i++)
-  // {
-  //   if(apis[i].getName() == api_name)
-  //   {
-  //     for (int j = 0; j < apis[i].getSize(); j++)
-  //     {
-  //       inputs_string = inputs_string + apis[i].getInput(j);
-  //       if (j != apis[i].getSize()-1)
-  //       {
-  //         inputs_string = inputs_string + ", ";
-  //       }
-  //     }
-  //     break;
-  //   }
-  // }
   
-  char run_api_func[200];
-  snprintf(run_api_func,sizeof(run_api_func),"%s(%s)",api_name.c_str(),inputs_string.c_str());
-  // Serial.printf("url_text : %s; function : %s()",String(url_text).c_str(),api_name.c_str());
-  String api_func = String(run_api_func);
-  Serial.println(api_func);
-  Serial.println(lua_global.Lua_dostring(&api_func)); 
-  // responseHtml("OK");     
 }
 
-void manageApis(String lua_code){
-  for (int i = 0; i < lua_code.length()-8; i++)
-  {
-    if (lua_code.substring(i, i+6)=="--#api")
-    {
-      int start_index = 0;
-      for (int j = i+3; j < lua_code.length()-10; j++)
-      {        
-        if (lua_code.substring(j,j+8)=="function")
-        {
-          start_index = j+9;
-        }
-        if(start_index!=0 && lua_code.substring(j,j+1)=="(")
-        {
-          String api_name = lua_code.substring(start_index,j);
-          api_name.trim();
-          apis[api_count].setName(api_name);
-          int input_start_index = 0;
-          if(lua_code.substring(j+1,j+2) != ")")
-          {
-            for (int k = j+2; k < lua_code.length()-10; k++)
-            {
-              if(lua_code.substring(k,k+1) == ",")
-              {
-                String input = lua_code.substring(input_start_index, k);
-                input.trim();
-                apis[api_count].addInput(input);
-                input_start_index = k+1;
-              }
-              else if(lua_code.substring(k,k+1) == ")")
-              {
-                String input = lua_code.substring(input_start_index, k);
-                input.trim();
-                apis[api_count].addInput(input);
-                break;
-              }
-            }
-          }
-          api_count++;
-          break;
-        }        
-      }      
-    }    
-  }  
-}
-
-
-
-void Log(String message){
-  Serial.printf("Log: %s\n", message.c_str());
-}
 void errLog(String message){
   Serial.printf("error log : %s", message.c_str());
 }
+
+
+
+void handleFileServer(){
+  String uri = server.uri();
+
+  Serial.printf("url : %s\n", uri.c_str());
+  
+  responseFile(uri);
+
+}
+void manageFileServer(){
+
+  List files = fileManager.getFolderFiles("/");
+
+  Serial.printf("files count : %d", files.size());
+  for (int i = 0; i < files.size(); i++)
+  {
+    Serial.printf("file : %s\n",files.get(i).c_str());
+    server.on(files.get(i), handleFileServer);    
+  }
+  server.on("/format",[]{fileManager.format();responseHtml("formated");});
+  server.on("/dgtlrd",[]{responseHtml(String(dgtlrd));});
+  server.on("/getapp",[]{getApp("http://www.imolkat.com/app.json");responseHtml("app installed");});
+  server.on("/resetfs",[]{manageFileServer();responseHtml("server reseted");});
+  server.on("/files",[]{if(!SPIFFS.begin()){ 
+        Serial.println("An Error has occurred while mounting SPIFFS");  
+    }
+    List files = List();
+    
+    Dir dir = SPIFFS.openDir("/");
+    String fileLists="";
+    while (dir.next()) {    
+        String fileName = dir.fileName();
+        Serial.printf("fileName : %s, fileSize: %d\n",fileName.c_str(),dir.fileSize());
+        // fileLists = String()
+        files.add(fileName);
+    }
+    SPIFFS.end();
+    responseHtml("printed");
+    });
+  
+}
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void getApp(String url){
  FSInfo fsinfo;
@@ -293,56 +214,18 @@ void getApp(String url){
     Serial.printf("fsinfo.blockSize: %d,fsinfo.maxOpenFiles: %d,fsinfo.maxPathLength: %d,fsinfo.pageSize: %d,fsinfo.totalBytes: %d,fsinfo.usedBytes: %d",fsinfo.blockSize,fsinfo.maxOpenFiles,fsinfo.maxPathLength,fsinfo.pageSize,fsinfo.totalBytes,fsinfo.usedBytes); 
 }
 
-void handleFileServer(){
-  String uri = server.uri();
 
-  Serial.printf("url : %s\n", uri.c_str());
-  
-  responseFile(uri);
-
-}
-void manageFileServer(){
-
-  List files = fileManager.getFolderFiles("/");
-
-  Serial.printf("files count : %d", files.size());
-  for (int i = 0; i < files.size(); i++)
-  {
-    Serial.printf("file : %s\n",files.get(i).c_str());
-    server.on(files.get(i), handleFileServer);    
-  }
-  server.on("/format",[]{fileManager.format();responseHtml("formated");});
-  server.on("/getapp",[]{getApp("http://www.imolkat.com/app.json");responseHtml("app installed");});
-  server.on("/resetfs",[]{manageFileServer();responseHtml("server reseted");});
-  server.on("/files",[]{if(!SPIFFS.begin()){ 
-        Serial.println("An Error has occurred while mounting SPIFFS");  
-    }
-    List files = List();
-    
-    Dir dir = SPIFFS.openDir("/");
-    String fileLists="";
-    while (dir.next()) {    
-        String fileName = dir.fileName();
-        Serial.printf("fileName : %s, fileSize: %d\n",fileName.c_str(),dir.fileSize());
-        // fileLists = String()
-        files.add(fileName);
-    }
-    SPIFFS.end();
-    responseHtml("printed");
-    });
-  
-}
-int lua_digitalRead(lua_State *lua){
-  int value = digitalRead(luaL_checkinteger(lua,0));
-  lua_pushinteger(lua,value);
-  return 1;
-}
+TouchKey touchKey1 = TouchKey("kitchen",14,5);
+TouchKey touchKey2 = TouchKey("hall1",12,0);
+TouchKey touchKey3 = TouchKey("hall2",16,4);
+TouchKey touchKey4 = TouchKey("bedroom",13,2);
+ 
 void setup() {
+  Serial.begin(115200);
   SPIFFS.begin();
-  // SPIFFS.format();
-  fileManager  = FileManager();
 
   WiFiManager wifiManager;
+
   //Static IP address configuration
   IPAddress staticIP(192, 168, 1, 61); //ESP static ip
   IPAddress gateway(192, 168, 1, 1);   //IP Address of your WiFi Router (Gateway)
@@ -353,102 +236,75 @@ void setup() {
   wifiManager.setSTAStaticIPConfig(staticIP, gateway, subnet, primaryDNS);
 
   wifiManager.autoConnect("DIACO_AP");
-  #ifndef STASSID
-  #define STASSID "Molkat"
-  #define STAPSK  "Bo!2bjaq"
-  #endif
 
-  const char* ssid = STASSID;
-  const char* password = STAPSK;
+  FileManager fileManager  = FileManager();
 
-
-  Serial.begin(115200);
-
-
-//  WiFi.hostname(deviceName);      // DHCP Hostname (useful for finding device for static lease)local_
-//  if (!WiFi.config(staticIP, gateway, subnet, primaryDNS, secondaryDNS)) {
-//    Serial.println("STA Failed to configure");
-//  }
-//  WiFi.mode(WIFI_STA);
-//  WiFi.begin(ssid, password);
-//
-//  // Wait for connection
-//  while (WiFi.status() != WL_CONNECTED) {
-//    delay(500);
-//    Serial.print(".");
-//  }
-//  Serial.println("");
-//  Serial.print("Connected to ");
-//  Serial.println(ssid);
-//  Serial.print("IP address: ");
-//  Serial.println(WiFi.localIP());
-//
-//  if (MDNS.begin("esp8266")) {
-//    Serial.println("MDNS responder started");
-//  }
-//  
-
-  // String lua_json = httpGet("http://www.imolkat.com/json.lua");
-  String lua_code = httpGet("http://www.imolkat.com/code.lua");
-  Serial.println(lua_code);
-  lua_global.Lua_register("responseHtml", (const lua_CFunction) &responseHtmllua);
-  lua_global.Lua_register("SelectQuery", (const lua_CFunction) &db_select);
-  lua_global.Lua_register("ExecuteQuery", (const lua_CFunction) &db_exec);
-  lua_global.Lua_register("tostring", (const lua_CFunction) &ConvertInttoString);
-  lua_global.Lua_register("digitalRead", (const lua_CFunction) &lua_digitalRead);
-  // Serial.println(lua_global.Lua_dostring(&lua_json));
-  // lua_code = lua_json + "\n" + lua_code;
-  // Serial.println(lua_code);
   
-  // Serial.println(lua_global.Lua_dostring(&lua_json));
-  // luaL_openlibs(lua_global.get_lua_State());
-  Serial.println(lua_global.Lua_dostring(&lua_code));
-  manageApis(lua_code);
-  
+Serial.println(touchKey1.SWITCH_LIGHT_API_TITLE);
+Serial.println("touchKey1.SWITCH_LIGHT_API_TITLE-----------------------------------------------------------------------------");
+
+  server.on(Uri(touchKey1.SWITCH_LIGHT_API_TITLE),[]{
+    String param = server.argName(0);
+    String value = server.arg(0);
+    responseHtml(touchKey1.switchKeyApi(param, value));});
+  server.on(Uri(touchKey1.GET_STATUS_TITLE),[]{responseHtml(touchKey1.getLightStatusApi());});
+
+  server.on(Uri(touchKey2.SWITCH_LIGHT_API_TITLE),[]{
+    String param = server.argName(0);
+    String value = server.arg(0);
+    responseHtml(touchKey2.switchKeyApi(param, value));});
+  server.on(Uri(touchKey2.GET_STATUS_TITLE),[]{responseHtml(touchKey2.getLightStatusApi());});
+
+  server.on(Uri(touchKey3.SWITCH_LIGHT_API_TITLE),[]{
+    String param = server.argName(0);
+    String value = server.arg(0);
+    responseHtml(touchKey3.switchKeyApi(param, value));});
+  server.on(Uri(touchKey3.GET_STATUS_TITLE),[]{responseHtml(touchKey3.getLightStatusApi());});
+
+  server.on(Uri(touchKey4.SWITCH_LIGHT_API_TITLE),[]{
+    String param = server.argName(0);
+    String value = server.arg(0);
+    responseHtml(touchKey4.switchKeyApi(param, value));});
+  server.on(Uri(touchKey4.GET_STATUS_TITLE),[]{responseHtml(touchKey4.getLightStatusApi());});
+  deviceIP = WiFi.localIP().toString();
+
+  server.on("/api/get_devices",[]{String res = "{\"swith\":[{\"id\":1,\"title\": \"Bedroom\",\"control_url\":\"http://192.168.1.61/api/switch_light_bedroom\",\"check\":\"http://192.168.1.61/api/gt_status_bedroom\"},{\"id\":2,\"title\": \"Kitchen\",\"control_url\":\"http://192.168.1.61/api/switch_light_kitchen\",\"check\":\"http://192.168.1.61/api/gt_status_kitchen\"},{\"id\":3,\"title\": \"Hall1\",\"control_url\":\"http://192.168.1.61/api/switch_light_hall1\",\"check\":\"http://192.168.1.61/api/gt_status_hall1\"},{\"id\":4,\"title\": \"Hall2\",\"control_url\":\"http://192.168.1.61/api/switch_light_hall2\",\"check\":\"http://192.168.1.61/api/gt_status_hall2\"}]}";res.replace("192.168.1.61",deviceIP);responseHtml(res);});
+    
   server.on("/", handleRoot);
 
-  for (int i = 0; i < api_count; i++)
-  {
-    api_name = apis[i].getName();
-    snprintf(url_text,sizeof(url_text), "/api/%s",api_name.c_str());
-    Serial.println(url_text);
-    server.on(String(url_text), handleAPI);
 
-  }
-  
-
-  server.on("/api", []() {
+  server.on("/api", []() {  
 
     String param = server.argName(0);
     String value = server.arg(0);
     Serial.println(param + " = " + value);
     // handleAPI(param, value);
   });
-  // DbManager dbManager = DbManager("MyTest");
-  // dbManager.ExecuteQuery("create table myTable(id, title)");
-  getApp("http://www.imolkat.com/app.json");
+  // if(fileManager.getFolderFiles("/").size() <15){
+  //   // fileManager.format();
+  //   getApp("http://www.imolkat.com/app.json");
+  // }
 
-  // Serial.println("getting App finished.***********************************************************************************");
   manageFileServer();
 
   server.onNotFound(handleNotFound);
 
   server.begin();
   Serial.println("HTTP server started");
-  String run_setup = String("Setup()");
-  Serial.println(lua_global.Lua_dostring(&run_setup));
-  Serial.printf("true value is %d\n",true);
   Serial.println(String(ESP.getFreeHeap()));
+  Serial.begin(115200);
 
 }
 
-
 void loop(void) {
-  // String run_loop = String("Loop()");
-  // lua_global.Lua_dostring(&run_loop);
-  // Serial.println(String(ESP.getFreeHeap()));
+  touchKey1.checkLoop();  
+  touchKey2.checkLoop();  
+  touchKey3.checkLoop();  
+  touchKey4.checkLoop();  
+
+
+  Serial.println(digitalRead(2));
   
   server.handleClient();
   MDNS.update();
-
 }
