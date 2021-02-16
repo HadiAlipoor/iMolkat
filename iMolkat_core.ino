@@ -227,8 +227,8 @@ void setup() {
   WiFiManager wifiManager;
 
   //Static IP address configuration
-  IPAddress staticIP(192, 168, 1, 61); //ESP static ip
-  IPAddress gateway(192, 168, 1, 1);   //IP Address of your WiFi Router (Gateway)
+  IPAddress staticIP(192, 168, 43, 61); //ESP static ip
+  IPAddress gateway(192, 168, 43, 1);   //IP Address of your WiFi Router (Gateway)
   IPAddress subnet(255, 255, 0, 0);
   IPAddress primaryDNS(8, 8, 8, 8);   //optional
   IPAddress secondaryDNS(8, 8, 4, 4); //optional
