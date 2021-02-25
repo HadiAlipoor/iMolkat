@@ -15,6 +15,7 @@
 #include <ESP8266mDNS.h>
 #include <WiFiManager.h>
 
+#include "NetworkManager.h"
 #include "DbManager.h"
 #include "FileManager.h"
 
@@ -56,7 +57,7 @@ String httpGet(String url) {
       http.end();
       return payload;
     } else {
-      Serial.printf("[HTTP} Unable to connect: %s\n",url.c_str());
+      Serial.printf("[HTTP] Unable to connect: %s\n",url.c_str());
       return "HTTP Unable to connect";
     }
   }
@@ -219,30 +220,42 @@ TouchKey touchKey1 = TouchKey("kitchen",14,5);
 TouchKey touchKey2 = TouchKey("hall1",12,0);
 TouchKey touchKey3 = TouchKey("hall2",16,4);
 TouchKey touchKey4 = TouchKey("bedroom",13,2);
+
+
+  NetworkManager networkManager;
  
 void setup() {
   Serial.begin(115200);
   SPIFFS.begin();
 
-  WiFiManager wifiManager;
-
-  //Static IP address configuration
-  IPAddress staticIP(192, 168, 43, 61); //ESP static ip
-  IPAddress gateway(192, 168, 43, 1);   //IP Address of your WiFi Router (Gateway)
-  IPAddress subnet(255, 255, 0, 0);
-  IPAddress primaryDNS(8, 8, 8, 8);   //optional
-  IPAddress secondaryDNS(8, 8, 4, 4); //optional
-  
-  wifiManager.setSTAStaticIPConfig(staticIP, gateway, subnet, primaryDNS);
-
-  wifiManager.autoConnect("DIACO_AP");
-
+  networkManager = NetworkManager(0);
+  networkManager.configNetwork();
   FileManager fileManager  = FileManager();
 
   
 Serial.println(touchKey1.SWITCH_LIGHT_API_TITLE);
-Serial.println("touchKey1.SWITCH_LIGHT_API_TITLE-----------------------------------------------------------------------------");
+Serial.println("touchKey1.SWITCH_LIGHT_API_TITLE***");
 
+  //// OS APIs
+  
+  server.on(Uri("/os/setwifiinfo"),[]{
+    String ssidParam = server.argName(0);
+    String ssidValue = server.arg(0);
+    String passParam = server.argName(1);
+    String passValue = server.arg(1);
+    String ipParam = server.argName(2);
+    String ipValue = server.arg(2);
+    if (ssidParam == "ssid" && passParam == "password" && ipParam == "ip")
+    {
+      networkManager.configNetwork(ssidValue,passValue,ipValue);
+    }
+    
+  });
+  
+  
+  ////APIs--------------------------
+
+  
   server.on(Uri(touchKey1.SWITCH_LIGHT_API_TITLE),[]{
     String param = server.argName(0);
     String value = server.arg(0);
@@ -280,6 +293,9 @@ Serial.println("touchKey1.SWITCH_LIGHT_API_TITLE--------------------------------
     Serial.println(param + " = " + value);
     // handleAPI(param, value);
   });
+
+  ////APIs--------------------------
+
   // if(fileManager.getFolderFiles("/").size() <15){
   //   // fileManager.format();
   //   getApp("http://www.imolkat.com/app.json");

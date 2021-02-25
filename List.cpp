@@ -19,7 +19,7 @@ List::List()
 {
     _size = 0;
     listString = "";
-    seprator = '♫';
+    seprator = '$';
 }
 
 void List::add(String value)
@@ -121,9 +121,16 @@ bool List::saveInFile(char *path){
     return file_write(path);
 }
 bool List::loadFromFile(char *path){
-    String fileContent = open_file(path);;
+    String fileContent = open_file(path);
     if(fileContent != "no_file"){
         listString = fileContent;
+        for (int i = 1; i < listString.length(); i++)
+        {
+            if (listString.substring(i,i+1)==String(seprator))
+            {
+                _size++;
+            }        
+        }   
         return true;
     }else{
         return false;
