@@ -14,17 +14,16 @@
 #include <WiFiClient.h>
 #include <ESP8266WebServer.h>
 #include <ESP8266mDNS.h>
-#include <WiFiManager.h>
+#include "WiFiManager.h"
 
 enum NetworkSettings{
     WifiAp,
     WifiPassword,
-    IpAddress
+    IpAddress,
 };
 
 class NetworkManager{
     public:
-        NetworkManager();
         NetworkManager(int deviceIndex);
         String getOtherDevicePassword(String apName);
         String getDeviceApName();
@@ -33,17 +32,26 @@ class NetworkManager{
         String getWifiName();
         String getWifiPassword();
         String getIPAddress();
-        bool IntegrateAllDevices(String mainSsid, String mainPassword);
+        bool IntegrateAllDevices();
         bool configNetwork();
         bool configNetwork(String ssid, String password, String ip);
         String httpGet(String url);
+        WiFiManager wifiManager;
+        void saveConfigCallback();
+        void process();
+        void handlApis();
+        void osTest();
+        // std::unique_ptr<ESP8266WebServer> server;
+        
     private:
         int _currentDeviceIndex;
         List _HotspotList;
         List _PasswordList;
         List _Settings;
         List _DevicesIP;
-        WiFiManager wifiManager;
 
-}
+
+        
+
+};
 #endif

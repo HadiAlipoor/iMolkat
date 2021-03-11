@@ -1,10 +1,8 @@
 #include "NetworkManager.h"
 
-NetworkManager::NetworkManager(){
-}
-
 NetworkManager::NetworkManager(int deviceIndex){
-    wifiManager.WiFi_eraseConfig();
+    wifiManager.erase();
+    
     
     _currentDeviceIndex = deviceIndex;
     _HotspotList = List();
@@ -30,11 +28,12 @@ NetworkManager::NetworkManager(int deviceIndex){
 
 }
 
-bool NetworkManager::IntegrateAllDevices(String mainSsid, String mainPassword){
+bool NetworkManager::IntegrateAllDevices(){
+    String mainSsid = wifiManager.getWiFiSSID();
+    String mainPassword = wifiManager.getWiFiPass();
+
     int numberOfNetworks = WiFi.scanNetworks();
     IPAddress localIP = WiFi.localIP();
-    
-    
     
     for(int i =0; i<numberOfNetworks; i++){
         String ssid = WiFi.SSID(i);
@@ -49,7 +48,8 @@ bool NetworkManager::IntegrateAllDevices(String mainSsid, String mainPassword){
                     if (ssid.equals(_HotspotList.get(j)))
                     {
                         String password = _PasswordList.get(j);
-                        wifiManager.connectWifi(ssid,password);
+                        WiFi.begin(ssid,password);
+                        
                         IPAddress deviceIp;
                         deviceIp[0]= localIP[0];
                         deviceIp[1]= localIP[1];
@@ -62,8 +62,8 @@ bool NetworkManager::IntegrateAllDevices(String mainSsid, String mainPassword){
                             deviceIp[3]= 72;
                         }
                         
-                        httpGet("http://192.168.0.1/os/setwifiinfo?ssid="+mainSsid+"&password="+mainPassword+"&ip="+deviceIp.toString());
-                        wifiManager.WiFi_Disconnect();
+                        httpGet("http://192.168.4.1/os/setwifiinfo?ssid="+mainSsid+"&password="+mainPassword+"&ip="+deviceIp.toString());
+                        WiFi.disconnect();
                         
                     }
                 }                
@@ -79,18 +79,23 @@ bool NetworkManager::IntegrateAllDevices(String mainSsid, String mainPassword){
 
 bool NetworkManager::configNetwork(){
     //Static IP address configuration
-  IPAddress staticIP(192, 168, 0, 1); //ESP static ip
-  IPAddress gateway(192, 168, 0, 1);   //IP Address of your WiFi Router (Gateway)
-  IPAddress subnet(255, 255, 0, 0);
-  IPAddress primaryDNS(8, 8, 8, 8);   //optional
-  IPAddress secondaryDNS(8, 8, 4, 4); //optional
-  
-  wifiManager.setSTAStaticIPConfig(staticIP, gateway, subnet, primaryDNS);
-
-  wifiManager.autoConnect(getDeviceApName(),getDevicePassword());
+    // IPAddress staticIP(192, 168, 0, 1); //ESP static ip
+    // IPAddress gateway(192, 168, 0, 1);   //IP Address of your WiFi Router (Gateway)
+    // IPAddress subnet(255, 255, 0, 0);
+    // IPAddress primaryDNS(8, 8, 8, 8);   //optional
+    // IPAddress secondaryDNS(8, 8, 4, 4); //optional
+    // server = wifiManager.server;
+    WiFi.mode(WIFI_STA); 
+    wifiManager.setConfigPortalBlocking(false);
+    wifiManager.setCaptivePortalEnable(false);
+    // wifiManager.setSTAStaticIPConfig(staticIP, gateway, subnet, primaryDNS);
+    wifiManager.autoConnect(getDeviceApName().c_str(),getDevicePassword().c_str());
+    //set config save notify callback
     return true;
 }
-
+void NetworkManager::process(){
+    wifiManager.process();
+}
 bool NetworkManager::configNetwork(String ssid, String password, String ip){  
     //Static IP address configuration
     IPAddress staticIP; //ESP static ip
@@ -98,7 +103,10 @@ bool NetworkManager::configNetwork(String ssid, String password, String ip){
     
     // wifiManager.setSTAStaticIPConfig(staticIP);//, gateway, subnet, primaryDNS);
 
-    wifiManager.connectWifi(ssid,password);
+    char const *_pass = password.c_str();
+    char const *_ssid = ssid.c_str();
+    wifiManager.autoConnect(_ssid,_pass);
+    
     return true;
 }
 
@@ -125,6 +133,7 @@ bool NetworkManager::setWifiData(String wifiName, String wifiPassword, String ip
     _Settings.add(wifiName);
     _Settings.add(wifiPassword);
     _Settings.add(ipAddress);
+    ///delete it before save!
     _Settings.saveInFile("/_Settings.ldb");
     return true;
 }
@@ -184,4 +193,20 @@ String NetworkManager::httpGet(String url) {
     Serial.println("WiFi Disconnected");
     return "WiFi Disconnected";
   }
+}
+
+void NetworkManager::saveConfigCallback(){
+    
+    IntegrateAllDevices();
+    Serial.println("All devices integrated;");
+}
+
+void NetworkManager::handlApis(){
+    wifiManager.preSetupConfigPortal();
+    wifiManager.server->on("/os/test",std::bind(&NetworkManager::osTest, this));
+}
+
+void NetworkManager::osTest(){
+    Serial.println(wifiManager.server->argName(0)); 
+    wifiManager.responseHtml("Hello");
 }

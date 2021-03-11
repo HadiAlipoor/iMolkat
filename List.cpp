@@ -121,6 +121,7 @@ bool List::saveInFile(char *path){
     return file_write(path);
 }
 bool List::loadFromFile(char *path){
+    
     String fileContent = open_file(path);
     if(fileContent != "no_file"){
         listString = fileContent;

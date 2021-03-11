@@ -13,7 +13,7 @@
 #include <WiFiClient.h>
 #include <ESP8266WebServer.h>
 #include <ESP8266mDNS.h>
-#include <WiFiManager.h>
+#include "WiFiManager.h"
 
 #include "NetworkManager.h"
 #include "DbManager.h"
@@ -222,22 +222,26 @@ TouchKey touchKey3 = TouchKey("hall2",16,4);
 TouchKey touchKey4 = TouchKey("bedroom",13,2);
 
 
-  NetworkManager networkManager;
+NetworkManager networkManager(0);
  
 void setup() {
   Serial.begin(115200);
   SPIFFS.begin();
 
-  networkManager = NetworkManager(0);
+  // networkManager = NetworkManager(0);
+  networkManager.handlApis();
   networkManager.configNetwork();
-  FileManager fileManager  = FileManager();
-
+  networkManager.wifiManager.setSaveConfigCallback([]{
+    networkManager.IntegrateAllDevices();
+  });
   
+  // FileManager fileManager  = FileManager();
+
 Serial.println(touchKey1.SWITCH_LIGHT_API_TITLE);
 Serial.println("touchKey1.SWITCH_LIGHT_API_TITLE***");
 
   //// OS APIs
-  
+    
   server.on(Uri("/os/setwifiinfo"),[]{
     String ssidParam = server.argName(0);
     String ssidValue = server.arg(0);
@@ -249,7 +253,7 @@ Serial.println("touchKey1.SWITCH_LIGHT_API_TITLE***");
     {
       networkManager.configNetwork(ssidValue,passValue,ipValue);
     }
-    
+    responseHtml("asdasd");
   });
   
   
@@ -281,7 +285,7 @@ Serial.println("touchKey1.SWITCH_LIGHT_API_TITLE***");
   server.on(Uri(touchKey4.GET_STATUS_TITLE),[]{responseHtml(touchKey4.getLightStatusApi());});
   deviceIP = WiFi.localIP().toString();
 
-  server.on("/api/get_devices",[]{String res = "{\"swith\":[{\"id\":1,\"title\": \"Bedroom\",\"control_url\":\"http://192.168.1.61/api/switch_light_bedroom\",\"check\":\"http://192.168.1.61/api/gt_status_bedroom\"},{\"id\":2,\"title\": \"Kitchen\",\"control_url\":\"http://192.168.1.61/api/switch_light_kitchen\",\"check\":\"http://192.168.1.61/api/gt_status_kitchen\"},{\"id\":3,\"title\": \"Hall1\",\"control_url\":\"http://192.168.1.61/api/switch_light_hall1\",\"check\":\"http://192.168.1.61/api/gt_status_hall1\"},{\"id\":4,\"title\": \"Hall2\",\"control_url\":\"http://192.168.1.61/api/switch_light_hall2\",\"check\":\"http://192.168.1.61/api/gt_status_hall2\"}]}";res.replace("192.168.1.61",deviceIP);responseHtml(res);});
+  
     
   server.on("/", handleRoot);
 
@@ -291,6 +295,7 @@ Serial.println("touchKey1.SWITCH_LIGHT_API_TITLE***");
     String param = server.argName(0);
     String value = server.arg(0);
     Serial.println(param + " = " + value);
+    
     // handleAPI(param, value);
   });
 
@@ -308,7 +313,6 @@ Serial.println("touchKey1.SWITCH_LIGHT_API_TITLE***");
   server.begin();
   Serial.println("HTTP server started");
   Serial.println(String(ESP.getFreeHeap()));
-  Serial.begin(115200);
 
 }
 
@@ -319,8 +323,8 @@ void loop(void) {
   touchKey4.checkLoop();  
 
 
-  Serial.println(digitalRead(2));
-  
+  // Serial.println(digitalRead(2));
   server.handleClient();
+  networkManager.process();
   MDNS.update();
 }
